@@ -43,6 +43,7 @@ Scrut (Facebook's Rust-based Cram successor) provides a roadmap for mdtest enhan
   - Could capture functions, aliases, shell options
 
 **NOT adopting from Scrut** (intentional decisions):
+
 - Shell-per-block isolation (destroys speed, complicates debugging)
 - State file serialization (persistent session is simpler)
 - `(esc)` emoji escaping (keep full Unicode)
@@ -109,6 +110,7 @@ Scrut (Facebook's Rust-based Cram successor) provides a roadmap for mdtest enhan
 **External Tool Adoption**
 
 After evaluating Cram, Scrut, trycmd, byexample, and mdsh:
+
 - **Cram/byexample** rejected due to Python dependency, isolation issues, no named captures
 - **Scrut** is best external tool but lacks named captures, requires Rust binary
 - **trycmd** excellent for Rust but not applicable to Bun/TypeScript

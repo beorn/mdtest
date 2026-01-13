@@ -32,8 +32,8 @@ mdtest example.test.md  # Standalone CLI (recommended)
 
 ```typescript
 // tests/md.test.ts
-import { registerMdTests } from '@beorn/mdtest/bun'
-await registerMdTests('tests/**/*.test.md')
+import { registerMdTests } from "@beorn/mdtest/bun";
+await registerMdTests("tests/**/*.test.md");
 ```
 
 ```bash
@@ -101,8 +101,8 @@ Run `.test.md` through `bun test` for mixed `.ts`/`.md` suites:
 **Setup:** Create `tests/md.test.ts`:
 
 ```typescript
-import { registerMdTests } from '@beorn/mdtest/bun'
-await registerMdTests('tests/**/*.test.md')
+import { registerMdTests } from "@beorn/mdtest/bun";
+await registerMdTests("tests/**/*.test.md");
 ```
 
 **Run:**
@@ -362,7 +362,7 @@ Hello, mdtest!
 export const config = {
   timeout: 5000,
   retries: 3,
-}
+};
 ```
 
 ```console
@@ -404,8 +404,8 @@ export const config = {
 Register individual files instead of glob pattern:
 
 ```typescript
-import { registerMdTestFile } from '@beorn/mdtest/bun'
-await registerMdTestFile('tests/specific.test.md')
+import { registerMdTestFile } from "@beorn/mdtest/bun";
+await registerMdTestFile("tests/specific.test.md");
 ```
 
 ## Development
