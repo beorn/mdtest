@@ -1,0 +1,53 @@
+{
+  "name": "@beorn/mdtest",
+  "version": "0.1.0",
+  "description": "Bun-native Cram-style markdown testing with persistent context & snapshot updates",
+  "type": "module",
+  "bin": {
+    "mdtest": "./src/index.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./api": "./src/api.ts",
+    "./session": "./src/session.ts",
+    "./bun": "./src/integrations/bun.ts"
+  },
+  "scripts": {
+    "test": "bun src/index.ts tests/example.test.md tests/features.test.md",
+    "typecheck": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/beorn/mdtest.git"
+  },
+  "homepage": "https://github.com/beorn/mdtest#readme",
+  "bugs": {
+    "url": "https://github.com/beorn/mdtest/issues"
+  },
+  "keywords": [
+    "test",
+    "testing",
+    "markdown",
+    "cram",
+    "doctest",
+    "bun",
+    "cli"
+  ],
+  "author": "Beorn",
+  "license": "MIT",
+  "devDependencies": {
+    "@commander-js/extra-typings": "^14.0.0",
+    "@types/bun": "latest",
+    "@types/debug": "^4.1.12",
+    "commander": "^14.0.1",
+    "typescript": "latest"
+  },
+  "dependencies": {
+    "debug": "^4.4.3",
+    "github-slugger": "^2.0.0",
+    "glob": "^11.0.0",
+    "mdast-util-to-string": "^4.0.0",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.5"
+  }
+}
