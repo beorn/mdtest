@@ -25,6 +25,10 @@ export function parseInfo(info: string): BlockOptions {
 
   if (/\breset\b/.test(info)) opts.reset = true;
 
+  // Parse cmd="..." (quoted value)
+  const cmdMatch = info.match(/\bcmd="([^"]+)"/);
+  if (cmdMatch) opts.cmd = cmdMatch[1];
+
   const pairs = info.match(/\b\w+=\S+/g) ?? [];
   for (const kv of pairs) {
     const idx = kv.indexOf("=");
@@ -38,6 +42,12 @@ export function parseInfo(info: string): BlockOptions {
     } else if (k === "timeout") {
       const n = Number(v);
       if (!Number.isNaN(n) && n > 0) opts.timeout = n;
+    } else if (k === "minWait") {
+      const n = Number(v);
+      if (!Number.isNaN(n) && n > 0) opts.minWait = n;
+    } else if (k === "maxWait") {
+      const n = Number(v);
+      if (!Number.isNaN(n) && n > 0) opts.maxWait = n;
     } else if (k === "cwd") opts.cwd = v;
     else if (k === "env") {
       const env: Record<string, string> = {};
@@ -67,10 +77,12 @@ export function parseBlock(body: string): {
   const finalizeStep = () => {
     if (currentCmd !== null) {
       // Remove trailing empty lines
-      while (expOut.length > 0 && expOut[expOut.length - 1] === "")
+      while (expOut.length > 0 && expOut[expOut.length - 1] === "") {
         expOut.pop();
-      while (expErr.length > 0 && expErr[expErr.length - 1] === "")
+      }
+      while (expErr.length > 0 && expErr[expErr.length - 1] === "") {
         expErr.pop();
+      }
       steps.push({
         cmd: currentCmd,
         expected: { stdout: expOut, stderr: expErr, exit: expExit },

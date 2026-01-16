@@ -76,8 +76,9 @@ export class TestSession {
 
     // Initialize state files if they don't exist
     if (!existsSync(this.envFile)) writeFileSync(this.envFile, "", "utf8");
-    if (!existsSync(this.cwdFile))
+    if (!existsSync(this.cwdFile)) {
       writeFileSync(this.cwdFile, this.testTempDir, "utf8");
+    }
     if (!existsSync(this.funcFile)) writeFileSync(this.funcFile, "", "utf8");
   }
 
@@ -247,10 +248,11 @@ export class TestSession {
 
     // 5. Run afterEach hook
     const afterEach = this.hookFiles.get("afterEach");
-    if (afterEach)
+    if (afterEach) {
       parts.push(
         `[ -f "${afterEach}" ] && source "${afterEach}" 2>/dev/null || true`,
       );
+    }
 
     // 6. Save state for next command
     parts.push("_EXIT=$?");
@@ -281,8 +283,9 @@ export class TestSession {
 
     // Clean up temp directory (includes helper files and hook files)
     try {
-      if (existsSync(this.testTempDir))
+      if (existsSync(this.testTempDir)) {
         rmSync(this.testTempDir, { recursive: true, force: true });
+      }
     } catch {
       // Ignore cleanup errors
     }

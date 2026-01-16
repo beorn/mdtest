@@ -94,8 +94,9 @@ function buildTestStructure(
     if (block.filename) continue;
 
     // Only process shell code blocks
-    if (!block.lang || !["console", "sh", "bash"].includes(block.lang))
+    if (!block.lang || !["console", "sh", "bash"].includes(block.lang)) {
       continue;
+    }
 
     const { steps } = parseBlock(block.value);
 
@@ -239,8 +240,9 @@ function registerNestedTests(
 
         test.serial(`$ ${testName}`, async () => {
           const result = await session.runCommand(step.cmd, step.expected);
-          if (!result.passed)
+          if (!result.passed) {
             throw new Error(result.diff || "Command output mismatch");
+          }
         });
       }
     }

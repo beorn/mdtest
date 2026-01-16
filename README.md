@@ -320,6 +320,38 @@ $ # Fresh context (env/cwd reset)
 ```
 ````
 
+### Custom Command Mode
+
+Test REPLs and interactive shells using `cmd="..."` to keep a subprocess running across commands:
+
+````markdown
+```console cmd="km sh board.md" minWait=50 maxWait=500
+$ key j
+$ state
+cursor: [0,1]
+node: Task A
+```
+````
+
+**How it works:**
+
+- A single subprocess is started for the block (not one per command)
+- Commands are sent to stdin, output captured from stdout/stderr
+- State persists between commands (unlike standard bash mode)
+- Timeout-based completion detection waits for output silence
+
+**Options:**
+
+- `cmd="..."` - Command to run as persistent subprocess
+- `minWait=N` - Milliseconds of silence before capture complete (default: 100)
+- `maxWait=N` - Maximum wait time per command in milliseconds (default: 2000)
+
+**Use cases:**
+
+- Testing REPLs where state persists (Node.js, Python, etc.)
+- Testing TUI shells with in-memory state
+- Any interactive command-line tool
+
 ### Lifecycle Hooks
 
 Define setup/teardown as bash functions:
@@ -411,3 +443,26 @@ await registerMdTestFile("tests/specific.test.md");
 ## Development
 
 For planned features, known issues, and development priorities, see [ROADMAP.md](./ROADMAP.md).
+
+## Roadmap
+
+### Marker Protocol (Future)
+
+For more deterministic REPL testing, mdtest may implement a marker-based protocol
+inspired by [pexpect's REPLWrapper](https://pexpect.readthedocs.io/en/latest/api/replwrap.html):
+
+1. mdtest sets `MDTEST_MARKER=<uuid>` environment variable
+2. REPL outputs marker after each command completes
+3. mdtest reads until marker, eliminating timeout guesswork
+
+This would require REPLs to opt-in by detecting and using the marker. Benefits:
+
+- Faster tests (no waiting for silence timeout)
+- More deterministic (no timing dependencies)
+- Handles slow output correctly
+
+See also:
+
+- [Expect](https://en.wikipedia.org/wiki/Expect) - Original prompt-based automation
+- [Shelldoc](https://github.com/endocode/shelldoc) - Persistent shell per markdown file
+- [Cram](https://bitheap.org/cram/) - Shell testing patterns

@@ -70,8 +70,9 @@ export function buildScript(
   // Apply block options
   if (opts.cwd) pre.push(`cd ${shellEscape(opts.cwd)}`);
   if (opts.env) {
-    for (const [k, v] of Object.entries(opts.env))
+    for (const [k, v] of Object.entries(opts.env)) {
       pre.push(`export ${k}=${shellEscape(v)}`);
+    }
   }
 
   const body = commands.join("\n");

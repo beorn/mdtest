@@ -97,6 +97,7 @@ import {
 } from "./markdown.js";
 import { buildScript, buildHookScript } from "./shell.js";
 import { bunShell } from "./integrations/bun.js";
+import { CmdSession } from "./cmdSession.js";
 import type { BlockOptions } from "./api.js";
 import createDebug from "debug";
 
@@ -213,28 +214,62 @@ async function runBlock(
   let lastExitCode = 0;
   const timeout = opts.timeout ?? 30000; // Default 30s timeout
 
-  for (const cmd of commands) {
-    const script = buildScript([cmd], opts, envFile, cwdFile, funcFile);
+  // Custom command mode: use persistent subprocess with CmdSession
+  if (opts.cmd) {
+    const session = new CmdSession(opts.cmd, {
+      cwd: cwd,
+      env: process.env as Record<string, string>,
+      minWait: opts.minWait,
+      maxWait: opts.maxWait,
+    });
 
-    // Execute command with timeout
-    let res;
     try {
-      res = await bunShell(["bash", "-lc", script], {
-        cwd: cwd,
-        env: process.env as Record<string, string>,
-        timeout: timeout,
-      });
-    } catch (err: unknown) {
-      // Handle unexpected errors (timeout handled inside bunShell())
-      throw err;
+      for (const cmd of commands) {
+        const res = await session.execute(cmd);
+        const stdout = splitNorm(res.stdout.toString());
+        const stderr = splitNorm(res.stderr.toString());
+        // Remove trailing empty lines
+        while (stdout.length > 0 && stdout[stdout.length - 1] === "") {
+          stdout.pop();
+        }
+        while (stderr.length > 0 && stderr[stderr.length - 1] === "") {
+          stderr.pop();
+        }
+        lastExitCode = res.exitCode ?? 0;
+        results.push({ command: cmd, stdout, stderr });
+      }
+    } finally {
+      await session.close();
     }
-    const stdout = splitNorm(res.stdout.toString());
-    const stderr = splitNorm(res.stderr.toString());
-    // Remove trailing empty line if present (split creates '' when string ends with \n)
-    while (stdout.length > 0 && stdout[stdout.length - 1] === "") stdout.pop();
-    while (stderr.length > 0 && stderr[stderr.length - 1] === "") stderr.pop();
-    lastExitCode = res.exitCode ?? 0;
-    results.push({ command: cmd, stdout, stderr });
+  } else {
+    // Standard bash mode: each command runs as separate process
+    for (const cmd of commands) {
+      const script = buildScript([cmd], opts, envFile, cwdFile, funcFile);
+
+      // Execute command with timeout
+      let res;
+      try {
+        res = await bunShell(["bash", "-lc", script], {
+          cwd: cwd,
+          env: process.env as Record<string, string>,
+          timeout: timeout,
+        });
+      } catch (err: unknown) {
+        // Handle unexpected errors (timeout handled inside bunShell())
+        throw err;
+      }
+      const stdout = splitNorm(res.stdout.toString());
+      const stderr = splitNorm(res.stderr.toString());
+      // Remove trailing empty line if present (split creates '' when string ends with \n)
+      while (stdout.length > 0 && stdout[stdout.length - 1] === "") {
+        stdout.pop();
+      }
+      while (stderr.length > 0 && stderr[stderr.length - 1] === "") {
+        stderr.pop();
+      }
+      lastExitCode = res.exitCode ?? 0;
+      results.push({ command: cmd, stdout, stderr });
+    }
   }
 
   // Combine all output for matching (backward compat)
@@ -328,8 +363,9 @@ async function testFile(
         }
 
         // Trim leading/trailing blank lines but preserve internal structure
-        while (bodyLines.length > 0 && bodyLines[0].trim() === "")
+        while (bodyLines.length > 0 && bodyLines[0].trim() === "") {
           bodyLines.shift();
+        }
         while (
           bodyLines.length > 0 &&
           bodyLines[bodyLines.length - 1].trim() === ""
@@ -493,9 +529,9 @@ async function testFile(
           const { command, stdout: cmdStdout } = nonHookResults[i];
           // Format multi-line commands with ┊ continuation
           const cmdLines = command.split("\n");
-          if (cmdLines.length === 1)
+          if (cmdLines.length === 1) {
             console.log(`    \x1b[32m✓\x1b[0m ${maybeTrunc(command)}`);
-          else {
+          } else {
             console.log(`    \x1b[32m✓\x1b[0m ${maybeTrunc(cmdLines[0])}`);
             for (let j = 1; j < cmdLines.length; j++) {
               console.log(`    ┊ ${maybeTrunc(cmdLines[j])}`);
@@ -505,8 +541,12 @@ async function testFile(
           // Add blank line between commands only if current command has output or not last
           const hasOutput = cmdStdout.length > 0;
           const isLast = i === nonHookResults.length - 1;
-          if (!isLast && (hasOutput || nonHookResults[i + 1].stdout.length > 0))
+          if (
+            !isLast &&
+            (hasOutput || nonHookResults[i + 1].stdout.length > 0)
+          ) {
             console.log("");
+          }
         }
         console.log(""); // Blank line after test
       } else {
@@ -532,9 +572,9 @@ async function testFile(
         for (const { command } of nonHookResults) {
           // Format multi-line commands with ┊ continuation
           const cmdLines = command.split("\n");
-          if (cmdLines.length === 1)
+          if (cmdLines.length === 1) {
             console.error(`    \x1b[31m✗\x1b[0m ${maybeTrunc(command)}`);
-          else {
+          } else {
             console.error(`    \x1b[31m✗\x1b[0m ${maybeTrunc(cmdLines[0])}`);
             for (let j = 1; j < cmdLines.length; j++) {
               console.error(`    ┊ ${maybeTrunc(cmdLines[j])}`);
@@ -543,16 +583,19 @@ async function testFile(
         }
         console.error(""); // Blank line before error details
 
-        if (!outMatch.ok)
+        if (!outMatch.ok) {
           console.error(
             hintMismatch("stdout", wantStdout, stdout, outMatch.msg),
           );
-        if (!errMatch.ok)
+        }
+        if (!errMatch.ok) {
           console.error(
             hintMismatch("stderr", wantStderr, stderr, errMatch.msg),
           );
-        if (!exitOk)
+        }
+        if (!exitOk) {
           console.error(`exit code: expected ${wantExit}, got ${exitCode}`);
+        }
         console.error(""); // Blank line after test
       }
 
@@ -583,8 +626,9 @@ async function testFile(
         if (stdout.length) rebuilt.push(...stdout);
         // stderr (only if non-empty)
         const nonBlankErr = stderr.filter((l) => l.length);
-        if (nonBlankErr.length)
+        if (nonBlankErr.length) {
           for (const l of stderr) rebuilt.push(l.length ? `! ${l}` : l);
+        }
         // exit code
         if (exitCode !== 0) rebuilt.push(`[${exitCode}]`);
 

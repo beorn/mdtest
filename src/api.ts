@@ -6,6 +6,11 @@ export interface BlockOptions {
   env?: Record<string, string>;
   reset?: boolean;
   timeout?: number; // Timeout in milliseconds (default: 30000ms / 30s)
+
+  // Custom command mode (persistent subprocess)
+  cmd?: string; // Custom command to run (e.g., "km sh board.md")
+  minWait?: number; // Min silence (ms) before capture complete (default: 100)
+  maxWait?: number; // Max total wait (ms) per command (default: 2000)
 }
 
 export interface MdTestOptions {

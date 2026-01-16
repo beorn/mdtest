@@ -158,8 +158,9 @@ function buildParentLinks(headings: Heading[]): void {
 
   for (const heading of headings) {
     // Pop stack until we find a higher-level heading (lower depth number)
-    while (stack.length > 0 && stack[stack.length - 1].depth >= heading.depth)
+    while (stack.length > 0 && stack[stack.length - 1].depth >= heading.depth) {
       stack.pop();
+    }
 
     // Top of stack is the parent (if any)
     if (stack.length > 0) heading.parent = stack[stack.length - 1];
