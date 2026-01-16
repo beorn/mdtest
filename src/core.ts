@@ -24,6 +24,8 @@ export function parseInfo(info: string): BlockOptions {
   if (!info) return opts;
 
   if (/\breset\b/.test(info)) opts.reset = true;
+  if (/\bpty=false\b/.test(info)) opts.pty = false;
+  else if (/\bpty\b/.test(info)) opts.pty = true;
 
   // Parse cmd="..." (quoted value)
   const cmdMatch = info.match(/\bcmd="([^"]+)"/);

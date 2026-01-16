@@ -6,10 +6,29 @@
  * stdout/stderr with timeout-based completion detection.
  *
  * This enables testing REPLs like `km sh` where state persists between commands.
+ *
+ * ## OSC 133 Shell Integration Protocol
+ *
+ * When useOsc133 is enabled, CmdSession uses the OSC 133 terminal shell integration
+ * protocol (used by Kitty, WezTerm, iTerm2, VS Code) for deterministic command
+ * completion detection instead of silence timeouts.
+ *
+ * Protocol sequences:
+ * - \x1b]133;A\x07 - Prompt start (REPL is ready for input)
+ * - \x1b]133;C\x07 - Command start (execution beginning)
+ * - \x1b]133;D;N\x07 - Command end with exit code N
+ *
+ * The REPL must emit these sequences when TERM_SHELL_INTEGRATION=1 is set.
  */
 
 import type { Subprocess } from "bun";
 import type { ShellResult } from "./shell.js";
+
+// OSC 133 escape sequence patterns (using BEL \x07 as terminator)
+// Pattern to match OSC 133;D with optional exit code: \x1b]133;D;N\x07 or \x1b]133;D\x07
+const OSC_133_D_PATTERN = /\x1b\]133;D(?:;(-?\d+))?\x07/;
+// Pattern to match any OSC 133 sequence for stripping
+const OSC_133_ANY_PATTERN = /\x1b\]133;[A-Z](?:;[^\x07]*)?\x07/g;
 
 export interface CmdSessionOpts {
   cwd?: string;
@@ -17,6 +36,7 @@ export interface CmdSessionOpts {
   minWait?: number; // ms of silence to wait (default: 100)
   maxWait?: number; // max ms total (default: 2000)
   startupDelay?: number; // ms to wait for subprocess to be ready (default: 0)
+  useOsc133?: boolean; // If true, detect OSC 133;D marker instead of silence (default: false)
   // State files for loading bash session state
   envFile?: string;
   cwdFile?: string;
@@ -31,6 +51,7 @@ export class CmdSession {
   private minWait: number;
   private maxWait: number;
   private startupDelay: number;
+  private useOsc133: boolean;
   private firstExecute = true;
   private closed = false;
 
@@ -42,6 +63,7 @@ export class CmdSession {
     this.minWait = opts.minWait ?? 100;
     this.maxWait = opts.maxWait ?? 2000;
     this.startupDelay = opts.startupDelay ?? 0;
+    this.useOsc133 = opts.useOsc133 ?? false;
 
     // Build wrapper script that loads session state before running the cmd
     const prelude: string[] = ["set +e"];
@@ -68,7 +90,12 @@ export class CmdSession {
       stdout: "pipe",
       stderr: "pipe",
       cwd: opts.cwd,
-      env: { ...process.env, ...opts.env },
+      env: {
+        ...process.env,
+        ...opts.env,
+        // Enable OSC 133 shell integration in subprocess
+        ...(this.useOsc133 ? { TERM_SHELL_INTEGRATION: "1" } : {}),
+      },
     });
 
     // Start background readers for both streams
@@ -125,6 +152,9 @@ export class CmdSession {
 
   /**
    * Execute a command and wait for output with timeout-based completion detection
+   *
+   * When useOsc133 is enabled, waits for OSC 133;D marker and extracts exit code.
+   * Falls back to silence-based detection on timeout.
    */
   async execute(command: string): Promise<ShellResult> {
     // Wait for subprocess to be ready on first execute
@@ -148,6 +178,7 @@ export class CmdSession {
     const startTime = Date.now();
     let lastOutputTime = Date.now();
     let lastLen = 0;
+    let exitCode = 0;
 
     while (true) {
       const elapsed = Date.now() - startTime;
@@ -159,7 +190,17 @@ export class CmdSession {
         lastLen = currentLen;
       }
 
+      // OSC 133 mode: check for completion marker
+      if (this.useOsc133) {
+        const match = this.stdoutBuffer.match(OSC_133_D_PATTERN);
+        if (match) {
+          exitCode = match[1] ? parseInt(match[1], 10) : 0;
+          break;
+        }
+      }
+
       // Silence timeout reached? (only if we have some output)
+      // In OSC 133 mode, this is a fallback for non-compliant REPLs
       const silenceTime = Date.now() - lastOutputTime;
       if (silenceTime >= this.minWait && currentLen > 0) {
         break;
@@ -174,10 +215,18 @@ export class CmdSession {
       await Bun.sleep(10);
     }
 
+    // Strip OSC 133 sequences from output (always strip when useOsc133 is enabled)
+    let stdout = this.stdoutBuffer;
+    let stderr = this.stderrBuffer;
+    if (this.useOsc133) {
+      stdout = stdout.replace(OSC_133_ANY_PATTERN, "");
+      stderr = stderr.replace(OSC_133_ANY_PATTERN, "");
+    }
+
     return {
-      stdout: Buffer.from(this.stdoutBuffer),
-      stderr: Buffer.from(this.stderrBuffer),
-      exitCode: 0, // Can't determine per-command exit code in persistent mode
+      stdout: Buffer.from(stdout),
+      stderr: Buffer.from(stderr),
+      exitCode,
     };
   }
 

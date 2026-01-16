@@ -12,6 +12,7 @@ export interface BlockOptions {
   minWait?: number; // Min silence (ms) before capture complete (default: 100)
   maxWait?: number; // Max total wait (ms) per command (default: 2000)
   startupDelay?: number; // Ms to wait for subprocess ready (default: 0)
+  pty?: boolean; // PTY mode (default on POSIX). Set false for pipe mode (separate stderr)
 }
 
 export interface MdTestOptions {

@@ -10,7 +10,7 @@ import {
 } from "fs";
 import { join } from "node:path";
 import { tmpdir } from "os";
-import { splitNorm } from "./core.js";
+import { splitNorm, matchLines, hintMismatch } from "./core.js";
 import type { ShellAdapter } from "./shell.js";
 import type { CommandResult } from "./api.js";
 import createDebug from "debug";
@@ -108,7 +108,6 @@ export class TestSession {
     let diff: string | undefined;
 
     if (expected) {
-      const { matchLines, hintMismatch } = await import("./core.js");
       const caps: Record<string, string> = {};
 
       // Check stdout

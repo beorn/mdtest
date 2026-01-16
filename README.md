@@ -325,7 +325,7 @@ $ # Fresh context (env/cwd reset)
 Test REPLs and interactive shells using `cmd="..."` to keep a subprocess running across commands:
 
 ````markdown
-```console cmd="km sh board.md" minWait=50 maxWait=500
+```console cmd="km sh board.md"
 $ key j
 $ state
 cursor: [0,1]
@@ -338,13 +338,31 @@ node: Task A
 - A single subprocess is started for the block (not one per command)
 - Commands are sent to stdin, output captured from stdout/stderr
 - State persists between commands (unlike standard bash mode)
-- Timeout-based completion detection waits for output silence
+- On POSIX (Linux/macOS): Uses PTY mode with OSC 133 shell integration for fast, deterministic detection
+- On Windows: Falls back to pipe mode with silence-based detection
 
 **Options:**
 
 - `cmd="..."` - Command to run as persistent subprocess
-- `minWait=N` - Milliseconds of silence before capture complete (default: 100)
+- `pty=false` - Force pipe mode instead of PTY (for separate stderr capture)
+- `minWait=N` - Milliseconds of silence before capture complete (default: 50 for PTY, 100 for pipes)
 - `maxWait=N` - Maximum wait time per command in milliseconds (default: 2000)
+- `startupDelay=N` - Milliseconds to wait for subprocess to be ready (default: 100 for PTY, 0 for pipes)
+
+**PTY mode (default on POSIX):**
+
+Uses Bun's native PTY support to give the subprocess a real terminal (`isTTY=true`). This enables:
+
+- **OSC 133 detection**: Programs that emit shell integration sequences (like `km sh`) signal command completion immediately, making tests ~6x faster
+- **Automatic feature detection**: TTY-aware programs enable colors, prompts, etc.
+- **No silence guessing**: Deterministic completion instead of waiting for output to stop
+
+REPLs can emit OSC 133 sequences when they detect a TTY:
+
+```typescript
+// After command output, emit completion marker with exit code
+process.stdout.write("\x1b]133;D;0\x07");
+```
 
 **Use cases:**
 
@@ -444,25 +462,75 @@ await registerMdTestFile("tests/specific.test.md");
 
 For planned features, known issues, and development priorities, see [ROADMAP.md](./ROADMAP.md).
 
-## Roadmap
+## Completion Detection
 
-### Marker Protocol (Future)
+mdtest detects command completion using markers or silence:
 
-For more deterministic REPL testing, mdtest may implement a marker-based protocol
-inspired by [pexpect's REPLWrapper](https://pexpect.readthedocs.io/en/latest/api/replwrap.html):
+### Detection Logic
 
-1. mdtest sets `MDTEST_MARKER=<uuid>` environment variable
-2. REPL outputs marker after each command completes
-3. mdtest reads until marker, eliminating timeout guesswork
+**Ready Detection (before command):**
 
-This would require REPLs to opt-in by detecting and using the marker. Benefits:
+```
+1. Wait for subprocess to be ready (first command only, or between commands):
+   - OSC 133;A marker detected → immediate ready (best)
+   - Any output received → subprocess started, proceed
+   - startupDelay ms elapsed → timeout, proceed anyway (fallback)
+2. Clear buffer
+```
 
-- Faster tests (no waiting for silence timeout)
-- More deterministic (no timing dependencies)
-- Handles slow output correctly
+**Completion Detection (after command):**
 
-See also:
+```
+1. Send command to subprocess
+2. Wait for completion signal:
+   - OSC 133;D marker detected → immediate completion (fastest)
+   - minWait ms of silence → assume complete (fallback)
+   - maxWait ms elapsed → timeout (safety net)
+3. Strip escape sequences from output
+```
+
+### Typical Scenarios
+
+| Scenario                               | Platform    | Mode | Ready Detection | Completion Detection | First Cmd    | Subsequent |
+| -------------------------------------- | ----------- | ---- | --------------- | -------------------- | ------------ | ---------- |
+| OSC 133-aware REPL (e.g., `km sh`)     | macOS/Linux | PTY  | OSC 133;A       | OSC 133;D            | ~50ms        | ~10ms      |
+| REPL with banner/prompt (e.g., Python) | macOS/Linux | PTY  | Any output      | Silence              | ~20ms        | ~50ms      |
+| OSC 133-aware REPL                     | Windows     | Pipe | Any output      | OSC 133;D            | ~20ms        | ~10ms      |
+| Silent REPL (no startup output)        | macOS/Linux | PTY  | Timeout         | Silence              | ~300ms       | ~50ms      |
+| Standard command (e.g., `cat`)         | macOS/Linux | PTY  | N/A             | Silence              | immediate    | ~50ms      |
+| Slow/hanging command                   | Any         | Any  | Timeout         | Timeout              | startupDelay | maxWait    |
+
+### Options
+
+- `startupDelay=N` - Max wait for subprocess ready before first command (default: 300ms PTY, 0ms pipe). If the subprocess emits OSC 133;A before this timeout, execution proceeds immediately.
+- `minWait=N` - Silence duration to assume completion (default: 50ms PTY, 100ms pipe)
+- `maxWait=N` - Maximum wait before timeout (default: 2000ms)
+
+### PTY vs Pipe Mode
+
+|                 | PTY (POSIX default) | Pipe (`pty=false` or Windows)       |
+| --------------- | ------------------- | ----------------------------------- |
+| Subprocess sees | `isTTY=true`        | `isTTY=false`                       |
+| OSC 133         | Auto-detected       | Requires `TERM_SHELL_INTEGRATION=1` |
+| stderr          | Merged with stdout  | Separate stream                     |
+| Platform        | macOS, Linux        | All platforms                       |
+
+### Implementing OSC 133 in Your REPL
+
+To enable fast, deterministic testing:
+
+```typescript
+// Emit completion marker after each command
+if (process.stdout.isTTY) {
+  process.stdout.write(`\x1b]133;D;${exitCode}\x07`);
+}
+```
+
+See [Kitty Shell Integration](https://sw.kovidgoyal.net/kitty/shell-integration/) for the full protocol.
+
+## See Also
 
 - [Expect](https://en.wikipedia.org/wiki/Expect) - Original prompt-based automation
 - [Shelldoc](https://github.com/endocode/shelldoc) - Persistent shell per markdown file
 - [Cram](https://bitheap.org/cram/) - Shell testing patterns
+- [pexpect REPLWrapper](https://pexpect.readthedocs.io/en/latest/api/replwrap.html) - Python REPL automation

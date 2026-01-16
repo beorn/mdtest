@@ -76,9 +76,9 @@
 // -----------------------------------------------------------------------------
 
 import { readFile, writeFile } from "node:fs/promises";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, dirname } from "node:path";
+import { join, dirname, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { glob } from "glob";
 import { Command } from "@commander-js/extra-typings";
@@ -98,6 +98,7 @@ import {
 import { buildScript, buildHookScript } from "./shell.js";
 import { bunShell } from "./integrations/bun.js";
 import { CmdSession } from "./cmdSession.js";
+import { PtySession } from "./ptySession.js";
 import type { BlockOptions } from "./api.js";
 import createDebug from "debug";
 
@@ -214,9 +215,10 @@ async function runBlock(
   let lastExitCode = 0;
   const timeout = opts.timeout ?? 30000; // Default 30s timeout
 
-  // Custom command mode: use persistent subprocess with CmdSession
+  // Custom command mode: use persistent subprocess with CmdSession or PtySession
   if (opts.cmd) {
-    const session = new CmdSession(opts.cmd, {
+    // Choose session type: PTY for real TTY (auto OSC 133), CmdSession for pipes
+    const sessionOpts = {
       cwd: cwd,
       env: process.env as Record<string, string>,
       minWait: opts.minWait,
@@ -226,12 +228,21 @@ async function runBlock(
       envFile: envFile,
       cwdFile: cwdFile,
       funcFile: funcFile,
-    });
+    };
+
+    // Default to PtySession on POSIX (faster OSC 133 detection, real TTY).
+    // Use CmdSession on Windows or when pty=false is explicitly set.
+    const isPosix = process.platform !== "win32";
+    const usePty = opts.pty ?? isPosix; // default to PTY on POSIX
+    const session = usePty
+      ? new PtySession(opts.cmd, sessionOpts)
+      : new CmdSession(opts.cmd, sessionOpts);
 
     try {
       for (const cmd of commands) {
         const res = await session.execute(cmd);
         const stdout = splitNorm(res.stdout.toString());
+        // PtySession merges stderr into stdout, so stderr is always empty for PTY
         const stderr = splitNorm(res.stderr.toString());
         // Remove trailing empty lines
         while (stdout.length > 0 && stdout[stdout.length - 1] === "") {
@@ -334,7 +345,6 @@ async function testFile(
 
   try {
     // Read test file from original path (before chdir)
-    const { isAbsolute } = await import("node:path");
     const testFilePath = isAbsolute(path) ? path : join(originalCwd, path);
     debug("Reading test file: %s", testFilePath);
     const md = await readFile(testFilePath, "utf8");
@@ -392,8 +402,6 @@ async function testFile(
     // Create helper files from file= blocks (must happen after chdir)
     for (const block of codeBlocks) {
       if (block.filename) {
-        const { writeFileSync } = await import("node:fs");
-        const { join } = await import("node:path");
         const filepath = join(testTempDir, block.filename);
         debugFiles("Creating file: %s", filepath);
         debugFiles("Content length: %d bytes", block.value.length);
@@ -658,7 +666,6 @@ async function testFile(
 
     // Cleanup temp directory (future: add --keep-temp flag to preserve for debugging)
     try {
-      const { rmSync } = await import("node:fs");
       rmSync(testTempDir, { recursive: true, force: true });
     } catch {
       // Ignore cleanup errors (temp will be cleaned by OS eventually)
