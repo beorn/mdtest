@@ -16,6 +16,10 @@ export interface CmdSessionOpts {
   env?: Record<string, string>;
   minWait?: number; // ms of silence to wait (default: 100)
   maxWait?: number; // max ms total (default: 2000)
+  // State files for loading bash session state
+  envFile?: string;
+  cwdFile?: string;
+  funcFile?: string;
 }
 
 export class CmdSession {
@@ -35,7 +39,25 @@ export class CmdSession {
     this.minWait = opts.minWait ?? 100;
     this.maxWait = opts.maxWait ?? 2000;
 
-    this.proc = Bun.spawn(["bash", "-c", cmd], {
+    // Build wrapper script that loads session state before running the cmd
+    const prelude: string[] = ["set +e"];
+    if (opts.envFile) {
+      prelude.push(
+        `if [ -f "${opts.envFile}" ]; then set -a; . "${opts.envFile}"; set +a; fi`,
+      );
+    }
+    if (opts.cwdFile) {
+      prelude.push(
+        `if [ -f "${opts.cwdFile}" ]; then cd "$(cat "${opts.cwdFile}")" 2>/dev/null || true; fi`,
+      );
+    }
+    if (opts.funcFile) {
+      prelude.push(`if [ -f "${opts.funcFile}" ]; then . "${opts.funcFile}"; fi`);
+    }
+    prelude.push(`exec ${cmd}`);
+    const wrapperScript = prelude.join("\n");
+
+    this.proc = Bun.spawn(["bash", "-c", wrapperScript], {
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",

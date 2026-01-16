@@ -221,6 +221,10 @@ async function runBlock(
       env: process.env as Record<string, string>,
       minWait: opts.minWait,
       maxWait: opts.maxWait,
+      // Pass state files so cmd inherits bash session state (env, cwd, functions)
+      envFile: envFile,
+      cwdFile: cwdFile,
+      funcFile: funcFile,
     });
 
     try {
