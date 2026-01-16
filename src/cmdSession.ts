@@ -16,6 +16,7 @@ export interface CmdSessionOpts {
   env?: Record<string, string>;
   minWait?: number; // ms of silence to wait (default: 100)
   maxWait?: number; // max ms total (default: 2000)
+  startupDelay?: number; // ms to wait for subprocess to be ready (default: 0)
   // State files for loading bash session state
   envFile?: string;
   cwdFile?: string;
@@ -29,6 +30,8 @@ export class CmdSession {
   private stderrBuffer: string = "";
   private minWait: number;
   private maxWait: number;
+  private startupDelay: number;
+  private firstExecute = true;
   private closed = false;
 
   // Track reader promises for cleanup
@@ -38,6 +41,7 @@ export class CmdSession {
   constructor(cmd: string, opts: CmdSessionOpts = {}) {
     this.minWait = opts.minWait ?? 100;
     this.maxWait = opts.maxWait ?? 2000;
+    this.startupDelay = opts.startupDelay ?? 0;
 
     // Build wrapper script that loads session state before running the cmd
     const prelude: string[] = ["set +e"];
@@ -52,7 +56,9 @@ export class CmdSession {
       );
     }
     if (opts.funcFile) {
-      prelude.push(`if [ -f "${opts.funcFile}" ]; then . "${opts.funcFile}"; fi`);
+      prelude.push(
+        `if [ -f "${opts.funcFile}" ]; then . "${opts.funcFile}"; fi`,
+      );
     }
     prelude.push(`exec ${cmd}`);
     const wrapperScript = prelude.join("\n");
@@ -121,6 +127,12 @@ export class CmdSession {
    * Execute a command and wait for output with timeout-based completion detection
    */
   async execute(command: string): Promise<ShellResult> {
+    // Wait for subprocess to be ready on first execute
+    if (this.firstExecute && this.startupDelay > 0) {
+      await Bun.sleep(this.startupDelay);
+      this.firstExecute = false;
+    }
+
     // Clear buffers
     this.stdoutBuffer = "";
     this.stderrBuffer = "";

@@ -11,6 +11,7 @@ export interface BlockOptions {
   cmd?: string; // Custom command to run (e.g., "km sh board.md")
   minWait?: number; // Min silence (ms) before capture complete (default: 100)
   maxWait?: number; // Max total wait (ms) per command (default: 2000)
+  startupDelay?: number; // Ms to wait for subprocess ready (default: 0)
 }
 
 export interface MdTestOptions {

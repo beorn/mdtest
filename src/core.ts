@@ -48,6 +48,9 @@ export function parseInfo(info: string): BlockOptions {
     } else if (k === "maxWait") {
       const n = Number(v);
       if (!Number.isNaN(n) && n > 0) opts.maxWait = n;
+    } else if (k === "startupDelay") {
+      const n = Number(v);
+      if (!Number.isNaN(n) && n >= 0) opts.startupDelay = n;
     } else if (k === "cwd") opts.cwd = v;
     else if (k === "env") {
       const env: Record<string, string> = {};
