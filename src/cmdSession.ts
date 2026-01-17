@@ -82,7 +82,9 @@ export class CmdSession {
         `if [ -f "${opts.funcFile}" ]; then . "${opts.funcFile}"; fi`,
       );
     }
-    prelude.push(`exec ${cmd}`);
+    // Don't use exec - the command might be a bash function from funcFile.
+    // exec only works with executables, not shell functions.
+    prelude.push(cmd);
     const wrapperScript = prelude.join("\n");
 
     this.proc = Bun.spawn(["bash", "-c", wrapperScript], {

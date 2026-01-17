@@ -20,8 +20,9 @@ import type { ShellResult } from "./shell.js";
 const OSC_133_A_PATTERN = /\x1b\]133;A\x07/; // Prompt ready (ready for input)
 const OSC_133_D_PATTERN = /\x1b\]133;D(?:;(-?\d+))?\x07/; // Command complete
 const OSC_133_ANY_PATTERN = /\x1b\]133;[A-Z](?:;[^\x07]*)?\x07/g;
-// Strip ANSI color/style codes too (terminals emit these)
-const ANSI_STYLE_PATTERN = /\x1b\[[0-9;]*m/g;
+// Strip ANSI escape codes (colors, cursor movement, clearing, etc.)
+// Common codes: m=color, G=cursor column, J=clear, K=erase, H=position, A-D=move
+const ANSI_ESCAPE_PATTERN = /\x1b\[[0-9;]*[A-Za-z]/g;
 
 export interface PtySessionOpts {
   cwd?: string;
@@ -76,7 +77,9 @@ export class PtySession {
         `if [ -f "${opts.funcFile}" ]; then . "${opts.funcFile}"; fi`,
       );
     }
-    prelude.push(`exec ${cmd}`);
+    // Don't use exec - the command might be a bash function from funcFile.
+    // exec only works with executables, not shell functions.
+    prelude.push(cmd);
     const wrapperScript = prelude.join("\n");
 
     this.proc = Bun.spawn(["bash", "-c", wrapperScript], {
@@ -143,8 +146,21 @@ export class PtySession {
     await this.waitForReady(readyTimeout);
     this.firstExecute = false;
 
-    // Write command to PTY
-    this.terminal?.write(command + "\n");
+    // Check if terminal is still alive
+    if (this.closed || !this.terminal) {
+      throw new Error(
+        `Terminal is closed (exit code: ${this.proc?.exitCode ?? "unknown"}, stdout so far: ${this.outputBuffer.slice(0, 200)})`,
+      );
+    }
+
+    // Write command to PTY (may throw if process exited)
+    try {
+      this.terminal.write(command + "\n");
+    } catch (e) {
+      throw new Error(
+        `Failed to write to terminal (exit code: ${this.proc?.exitCode ?? "unknown"}, stdout so far: ${this.outputBuffer.slice(0, 500)}): ${String(e)}`,
+      );
+    }
 
     // Wait for output with timeout logic
     const startTime = Date.now();
@@ -189,9 +205,9 @@ export class PtySession {
     // Strip OSC 133 sequences
     stdout = stdout.replace(OSC_133_ANY_PATTERN, "");
 
-    // Strip ANSI color codes if requested
+    // Strip ANSI escape codes if requested
     if (this.stripAnsi) {
-      stdout = stdout.replace(ANSI_STYLE_PATTERN, "");
+      stdout = stdout.replace(ANSI_ESCAPE_PATTERN, "");
     }
 
     // Normalize line endings (PTY uses \r\n)
