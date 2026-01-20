@@ -1,8 +1,13 @@
 // Integration tests: Verify bun test integration behavior
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { writeFileSync, unlinkSync, mkdtempSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
 import { tmpdir } from "os";
+import { $ } from "bun";
+import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const mdtestCli = join(__dirname, "../src/index.ts");
 
 describe("bun integration", () => {
   describe("error output formatting", () => {
@@ -33,14 +38,29 @@ goodbye
       } catch {}
     });
 
-    test.todo("error output should be clean without stack traces", async () => {
-      // This test should verify:
-      // 1. Failed test shows expected/actual diff
-      // 2. No stack trace from expect().fail()
-      // 3. Clean, readable error message
-      //
-      // Current behavior: Shows full stack trace with file paths
-      // Expected behavior: Only show the diff provided to expect().fail()
+    test("error output should be clean without stack traces", async () => {
+      // Run mdtest on the failing test file and capture both stdout and stderr
+      const proc = Bun.spawn(["bun", mdtestCli, tempFile], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const [stdout, stderr] = await Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+      ]);
+      const result = stdout + stderr;
+
+      // Should show expected/actual diff
+      expect(result).toContain("expected");
+      expect(result).toContain("actual");
+
+      // Should show the failing test content
+      expect(result).toContain("hello");
+      expect(result).toContain("goodbye");
+
+      // Should NOT contain raw stack traces from internal code
+      // (Some path info is acceptable in test output, but not internal stack frames)
+      expect(result).not.toContain("at processTicksAndRejections");
     });
   });
 
@@ -93,26 +113,20 @@ test B
       } catch {}
     });
 
-    test.skip("registered tests should be properly nested under headings", async () => {
-      // This test is skipped because registerMdTestFile() calls describe.serial()
-      // which cannot be called from within a test context.
-      //
-      // The bug is fixed and verified by running actual .test.md files:
-      // - findNearestHeading now receives block.position.start instead of block.position
-      // - Tests are properly nested under heading hierarchy
-      // - No tests should be under "(no heading)" unless they truly have no heading
-      //
-      // To verify: run `bun test --verbose` and check that tests show proper headings
-      // instead of "(no heading)"
+    test("verify describe block nesting matches heading hierarchy", async () => {
+      // Run mdtest on the test file and check output shows proper heading hierarchy
+      const result = await $`bun ${mdtestCli} ${tempFile}`.nothrow().quiet().text();
 
-      expect(true).toBe(true);
-    });
+      // Should show proper heading structure in output
+      expect(result).toContain("Setup");
+      expect(result).toContain("Section A");
+      expect(result).toContain("Subsection A.1");
+      expect(result).toContain("Section B");
 
-    test.todo("verify describe block nesting matches heading hierarchy", () => {
-      // This test should verify:
-      // 1. describe('test.md') contains describe('Setup')
-      // 2. describe('Section A') contains describe('Subsection A.1')
-      // 3. describe('Section B') exists at the same level as 'Section A'
+      // All tests should pass (output contains checkmarks or success indicator)
+      expect(result).toContain("✓");
+      // Should NOT show "(no heading)" - that indicates broken heading detection
+      expect(result).not.toContain("(no heading)");
     });
   });
 });

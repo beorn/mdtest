@@ -2,17 +2,15 @@
 // These functions have no side effects and are easy to test
 
 import type { BlockOptions } from "./api.js";
+import { DEFAULTS } from "./constants.js";
 
-// Constants
-const MAX_OUTPUT_LENGTH = 500;
-
-export type Expect = {
+type Expect = {
   stdout: string[];
   stderr: string[];
   exit: number | undefined;
 };
 
-export type Step = {
+type Step = {
   cmd: string;
   expected: Expect;
 };
@@ -131,7 +129,7 @@ export function parseBlock(body: string): {
 
 // ============ Line Normalization ============
 
-export function normLine(s: string): string {
+function normLine(s: string): string {
   return s.replace(/\s+$/g, "");
 }
 
@@ -287,10 +285,10 @@ export function hintMismatch(
     if (!arr.length) return "⟂(empty)";
     const text = arr.join("\n");
     // Truncate long output to avoid overwhelming test output
-    if (text.length > MAX_OUTPUT_LENGTH) {
+    if (text.length > DEFAULTS.OUTPUT_MAX_LENGTH) {
       return (
-        text.slice(0, MAX_OUTPUT_LENGTH) +
-        `\n... [${text.length - MAX_OUTPUT_LENGTH} characters truncated]`
+        text.slice(0, DEFAULTS.OUTPUT_MAX_LENGTH) +
+        `\n... [${text.length - DEFAULTS.OUTPUT_MAX_LENGTH} characters truncated]`
       );
     }
     return text;

@@ -15,6 +15,7 @@
  */
 
 import type { ShellResult } from "./shell.js";
+import { DEFAULTS } from "./constants.js";
 
 // OSC 133 escape sequence patterns
 const OSC_133_A_PATTERN = /\x1b\]133;A\x07/; // Prompt ready (ready for input)
@@ -54,9 +55,9 @@ export class PtySession {
   } | null = null;
 
   constructor(cmd: string, opts: PtySessionOpts = {}) {
-    this.minWait = opts.minWait ?? 50;
-    this.maxWait = opts.maxWait ?? 2000;
-    this.startupDelay = opts.startupDelay ?? 300;
+    this.minWait = opts.minWait ?? DEFAULTS.PTY_SESSION.MIN_WAIT;
+    this.maxWait = opts.maxWait ?? DEFAULTS.PTY_SESSION.MAX_WAIT;
+    this.startupDelay = opts.startupDelay ?? DEFAULTS.PTY_SESSION.STARTUP_DELAY;
     this.stripAnsi = opts.stripAnsi ?? true;
 
     // Build wrapper script that loads session state before running the cmd

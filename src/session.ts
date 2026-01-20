@@ -13,20 +13,30 @@ import { tmpdir } from "os";
 import { splitNorm, matchLines, hintMismatch } from "./core.js";
 import type { ShellAdapter } from "./shell.js";
 import type { CommandResult } from "./api.js";
+import { createStatePaths, ensureStateFiles, type StateFiles } from "./state.js";
 import createDebug from "debug";
 
 const debug = createDebug("mdtest:session");
 
 export class TestSession {
-  private envFile: string;
-  private cwdFile: string;
-  private funcFile: string;
+  private statePaths: StateFiles;
   private baseDir: string;
   private testTempDir: string;
   private originalCwd: string;
   private helperFiles = new Map<string, string>(); // filename -> filepath in tempDir
   private hookFiles = new Map<string, string>(); // hookName -> filepath in tempDir
   private shell: ShellAdapter;
+
+  // Expose state file paths for compatibility
+  get envFile(): string {
+    return this.statePaths.envFile;
+  }
+  get cwdFile(): string {
+    return this.statePaths.cwdFile;
+  }
+  get funcFile(): string {
+    return this.statePaths.funcFile;
+  }
 
   constructor(
     public filePath: string,
@@ -40,11 +50,7 @@ export class TestSession {
     // Store state files in the unique temp directory to avoid race conditions
     // when running the same test file multiple times concurrently
     this.baseDir = this.testTempDir;
-    const safe = filePath.replace(/[^A-Za-z0-9._-]/g, "_");
-
-    this.envFile = join(this.baseDir, `${safe}.env.sh`);
-    this.cwdFile = join(this.baseDir, `${safe}.cwd.txt`);
-    this.funcFile = join(this.baseDir, `${safe}.func.sh`);
+    this.statePaths = createStatePaths(filePath, this.baseDir);
   }
 
   /**
@@ -75,11 +81,7 @@ export class TestSession {
     process.chdir(this.testTempDir);
 
     // Initialize state files if they don't exist
-    if (!existsSync(this.envFile)) writeFileSync(this.envFile, "", "utf8");
-    if (!existsSync(this.cwdFile)) {
-      writeFileSync(this.cwdFile, this.testTempDir, "utf8");
-    }
-    if (!existsSync(this.funcFile)) writeFileSync(this.funcFile, "", "utf8");
+    ensureStateFiles(this.statePaths, this.testTempDir);
   }
 
   async runCommand(

@@ -23,6 +23,7 @@
 
 import type { Subprocess } from "bun";
 import type { ShellResult } from "./shell.js";
+import { DEFAULTS } from "./constants.js";
 
 // OSC 133 escape sequence patterns (using BEL \x07 as terminator)
 // Pattern to match OSC 133;D with optional exit code: \x1b]133;D;N\x07 or \x1b]133;D\x07
@@ -60,9 +61,9 @@ export class CmdSession {
   private stderrReader: Promise<void> | null = null;
 
   constructor(cmd: string, opts: CmdSessionOpts = {}) {
-    this.minWait = opts.minWait ?? 100;
-    this.maxWait = opts.maxWait ?? 2000;
-    this.startupDelay = opts.startupDelay ?? 0;
+    this.minWait = opts.minWait ?? DEFAULTS.CMD_SESSION.MIN_WAIT;
+    this.maxWait = opts.maxWait ?? DEFAULTS.CMD_SESSION.MAX_WAIT;
+    this.startupDelay = opts.startupDelay ?? DEFAULTS.CMD_SESSION.STARTUP_DELAY;
     this.useOsc133 = opts.useOsc133 ?? false;
 
     // Build wrapper script that loads session state before running the cmd

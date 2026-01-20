@@ -76,7 +76,7 @@
 // -----------------------------------------------------------------------------
 
 import { readFile, writeFile } from "node:fs/promises";
-import { existsSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -85,7 +85,6 @@ import { Command } from "@commander-js/extra-typings";
 import {
   parseInfo,
   parseBlock,
-  splitNorm,
   matchLines,
   hasPatterns,
   hintMismatch,
@@ -95,11 +94,7 @@ import {
   findNearestHeading,
   generateTestId,
 } from "./markdown.js";
-import { buildScript, buildHookScript } from "./shell.js";
-import { bunShell } from "./integrations/bun.js";
-import { CmdSession } from "./cmdSession.js";
-import { PtySession } from "./ptySession.js";
-import type { BlockOptions } from "./api.js";
+import { runBlock, callHookIfExists } from "./executor.js";
 import createDebug from "debug";
 
 const debug = createDebug("mdtest:runner");
@@ -149,12 +144,11 @@ const patterns = program.args;
 const UPDATE = opts.update;
 const SHOW_BODY = !opts.hideBody;
 const TRUNCATE = opts.trunc;
-const TRUNC_WIDTH = 70;
 
 // Helper to truncate long lines
 function maybeTrunc(line: string): string {
-  if (!TRUNCATE || line.length <= TRUNC_WIDTH) return line;
-  return line.slice(0, TRUNC_WIDTH - 3) + "...";
+  if (!TRUNCATE || line.length <= DEFAULTS.TRUNCATE_WIDTH) return line;
+  return line.slice(0, DEFAULTS.TRUNCATE_WIDTH - 3) + "...";
 }
 
 // Expand glob patterns (handles both shell-expanded and quoted patterns)
@@ -176,142 +170,27 @@ debug("Found %d test files", files.length);
 debug("Files: %O", files);
 
 // -------- Global (per-file) persistent context (env + cwd + functions) --------
+import {
+  createStatePaths,
+  ensureStateFiles as ensureStateFilesImpl,
+  clearState as clearStateImpl,
+  type StateFiles,
+} from "./state.js";
+import { DEFAULTS } from "./constants.js";
+
 const baseDir = mkdtempSync(join(tmpdir(), "mdtest-"));
-// We’ll keep one pair of files per *input file path* so parallel files don’t collide.
-function statePathsFor(file: string) {
-  const safe = file.replace(/[^A-Za-z0-9._-]/g, "_");
-  return {
-    envFile: join(baseDir, `${safe}.env.sh`),
-    cwdFile: join(baseDir, `${safe}.cwd.txt`),
-    funcFile: join(baseDir, `${safe}.func.sh`),
-  };
+
+// We'll keep one pair of files per *input file path* so parallel files don't collide.
+function statePathsFor(file: string): StateFiles {
+  return createStatePaths(file, baseDir);
 }
 
-function ensureStateFiles(envFile: string, cwdFile: string, funcFile: string) {
-  if (!existsSync(envFile)) writeFileSync(envFile, "", "utf8");
-  if (!existsSync(cwdFile)) writeFileSync(cwdFile, process.cwd(), "utf8");
-  if (!existsSync(funcFile)) writeFileSync(funcFile, "", "utf8");
+function ensureStateFilesLocal(paths: StateFiles) {
+  ensureStateFilesImpl(paths, process.cwd());
 }
 
-function clearState(envFile: string, cwdFile: string, funcFile: string) {
-  writeFileSync(envFile, "", "utf8");
-  writeFileSync(cwdFile, process.cwd(), "utf8");
-  writeFileSync(funcFile, "", "utf8");
-}
-
-async function runBlock(
-  commands: string[],
-  opts: BlockOptions,
-  envFile: string,
-  cwdFile: string,
-  funcFile: string,
-  cwd: string,
-) {
-  const results: Array<{
-    command: string;
-    stdout: string[];
-    stderr: string[];
-  }> = [];
-  let lastExitCode = 0;
-  const timeout = opts.timeout ?? 30000; // Default 30s timeout
-
-  // Custom command mode: use persistent subprocess with CmdSession or PtySession
-  if (opts.cmd) {
-    // Choose session type: PTY for real TTY (auto OSC 133), CmdSession for pipes
-    const sessionOpts = {
-      cwd: cwd,
-      env: process.env as Record<string, string>,
-      minWait: opts.minWait,
-      maxWait: opts.maxWait,
-      startupDelay: opts.startupDelay,
-      // Pass state files so cmd inherits bash session state (env, cwd, functions)
-      envFile: envFile,
-      cwdFile: cwdFile,
-      funcFile: funcFile,
-    };
-
-    // Default to PtySession on POSIX (faster OSC 133 detection, real TTY).
-    // Use CmdSession on Windows or when pty=false is explicitly set.
-    const isPosix = process.platform !== "win32";
-    const usePty = opts.pty ?? isPosix; // default to PTY on POSIX
-    const session = usePty
-      ? new PtySession(opts.cmd, sessionOpts)
-      : new CmdSession(opts.cmd, sessionOpts);
-
-    try {
-      for (const cmd of commands) {
-        const res = await session.execute(cmd);
-        const stdout = splitNorm(res.stdout.toString());
-        // PtySession merges stderr into stdout, so stderr is always empty for PTY
-        const stderr = splitNorm(res.stderr.toString());
-        // Remove trailing empty lines
-        while (stdout.length > 0 && stdout[stdout.length - 1] === "") {
-          stdout.pop();
-        }
-        while (stderr.length > 0 && stderr[stderr.length - 1] === "") {
-          stderr.pop();
-        }
-        lastExitCode = res.exitCode ?? 0;
-        results.push({ command: cmd, stdout, stderr });
-      }
-    } finally {
-      await session.close();
-    }
-  } else {
-    // Standard bash mode: each command runs as separate process
-    for (const cmd of commands) {
-      const script = buildScript([cmd], opts, envFile, cwdFile, funcFile);
-
-      // Execute command with timeout
-      let res;
-      try {
-        res = await bunShell(["bash", "-lc", script], {
-          cwd: cwd,
-          env: process.env as Record<string, string>,
-          timeout: timeout,
-        });
-      } catch (err: unknown) {
-        // Handle unexpected errors (timeout handled inside bunShell())
-        throw err;
-      }
-      const stdout = splitNorm(res.stdout.toString());
-      const stderr = splitNorm(res.stderr.toString());
-      // Remove trailing empty line if present (split creates '' when string ends with \n)
-      while (stdout.length > 0 && stdout[stdout.length - 1] === "") {
-        stdout.pop();
-      }
-      while (stderr.length > 0 && stderr[stderr.length - 1] === "") {
-        stderr.pop();
-      }
-      lastExitCode = res.exitCode ?? 0;
-      results.push({ command: cmd, stdout, stderr });
-    }
-  }
-
-  // Combine all output for matching (backward compat)
-  const allStdout = results.flatMap((r) => r.stdout);
-  const allStderr = results.flatMap((r) => r.stderr);
-
-  return {
-    stdout: allStdout,
-    stderr: allStderr,
-    exitCode: lastExitCode,
-    results,
-  };
-}
-
-// -------- Hook auto-calling --------
-async function callHookIfExists(
-  hookName: string,
-  envFile: string,
-  cwdFile: string,
-  funcFile: string,
-) {
-  const script = buildHookScript(hookName, envFile, cwdFile, funcFile);
-  await bunShell(["bash", "-lc", script], {
-    cwd: process.cwd(),
-    env: process.env as Record<string, string>,
-  });
+function clearStateLocal(paths: StateFiles) {
+  clearStateImpl(paths, process.cwd());
 }
 
 // -------- File processing & snapshot updating --------
@@ -422,8 +301,9 @@ async function testFile(
         body: bodyTexts.get(block.position.start.offset || 0),
       }));
 
-    const { envFile, cwdFile, funcFile } = statePathsFor(path);
-    ensureStateFiles(envFile, cwdFile, funcFile);
+    const statePaths = statePathsFor(path);
+    const { envFile, cwdFile, funcFile } = statePaths;
+    ensureStateFilesLocal(statePaths);
 
     // Output file header (markdown format)
     if (!isFirstFile) console.log("\n---\n");
@@ -475,7 +355,7 @@ async function testFile(
 
       const opts = parseInfo(f.info);
       if (opts.reset) {
-        clearState(envFile, cwdFile, funcFile);
+        clearStateLocal(statePaths);
         Object.keys(capsStdout).forEach((k) => delete capsStdout[k]);
         Object.keys(capsStderr).forEach((k) => delete capsStderr[k]);
       }

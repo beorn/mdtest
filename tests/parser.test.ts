@@ -352,7 +352,7 @@ describe("matching", () => {
 
 // ============ CLI Integration Tests ============
 
-describe.skip("cli", () => {
+describe("cli", () => {
   test.concurrent("basic exec", async () => {
     const file = createTestFile(mkBlock('$ echo "Hello"\nHello'));
     const result = await runMdtest(file);

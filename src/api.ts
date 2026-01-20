@@ -15,16 +15,9 @@ export interface BlockOptions {
   pty?: boolean; // PTY mode (default on POSIX). Set false for pipe mode (separate stderr)
 }
 
-export interface MdTestOptions {
-  update?: boolean;
-  format?: "default" | "compact" | "tap";
-  useHeadings?: boolean; // true = show full headings, false = slugs
-  showCommandPrefix?: boolean; // true = include $ in output
-  serial?: boolean; // Always true for now (future: concurrent)
-  timeout?: number; // Per-command timeout (ms)
-  verbose?: boolean; // Show all output
-  quiet?: boolean; // Suppress passing test output
-}
+// Note: Programmatic API is not yet implemented.
+// Use the CLI (mdtest) or Bun integration (@beorn/mdtest/bun) instead.
+// See README.md for usage.
 
 export interface CommandResult {
   command: string;
@@ -56,26 +49,4 @@ export interface FileResult {
   totalCommands: number;
   passedCommands: number;
   duration: number;
-}
-
-// Core execution API (to be implemented)
-export async function runMdTestFile(
-  _file: string,
-  _options?: MdTestOptions,
-): Promise<FileResult> {
-  throw new Error("Not implemented yet - will be implemented in next phase");
-}
-
-export async function runMdTests(
-  files: string[],
-  options?: MdTestOptions,
-): Promise<FileResult[]> {
-  const results: FileResult[] = [];
-
-  for (const file of files) {
-    const result = await runMdTestFile(file, options);
-    results.push(result);
-  }
-
-  return results;
 }
