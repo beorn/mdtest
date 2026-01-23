@@ -77,7 +77,13 @@ describe("shell", () => {
     });
 
     test("generates script with state loading", () => {
-      const script = buildScript(["echo hello"], {}, envFile, cwdFile, funcFile);
+      const script = buildScript(
+        ["echo hello"],
+        {},
+        envFile,
+        cwdFile,
+        funcFile,
+      );
 
       expect(script).toContain("set +e");
       expect(script).toContain(`if [ -f "${envFile}" ]`);
@@ -99,7 +105,13 @@ describe("shell", () => {
     });
 
     test("includes state saving at end", () => {
-      const script = buildScript(["echo hello"], {}, envFile, cwdFile, funcFile);
+      const script = buildScript(
+        ["echo hello"],
+        {},
+        envFile,
+        cwdFile,
+        funcFile,
+      );
 
       expect(script).toContain("_EXIT=$?");
       expect(script).toContain(`pwd > "${cwdFile}"`);

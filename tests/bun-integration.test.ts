@@ -115,7 +115,10 @@ test B
 
     test("verify describe block nesting matches heading hierarchy", async () => {
       // Run mdtest on the test file and check output shows proper heading hierarchy
-      const result = await $`bun ${mdtestCli} ${tempFile}`.nothrow().quiet().text();
+      const result = await $`bun ${mdtestCli} ${tempFile}`
+        .nothrow()
+        .quiet()
+        .text();
 
       // Should show proper heading structure in output
       expect(result).toContain("Setup");

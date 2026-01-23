@@ -13,7 +13,11 @@ import { tmpdir } from "os";
 import { splitNorm, matchLines, hintMismatch } from "./core.js";
 import type { ShellAdapter } from "./shell.js";
 import type { CommandResult } from "./api.js";
-import { createStatePaths, ensureStateFiles, type StateFiles } from "./state.js";
+import {
+  createStatePaths,
+  ensureStateFiles,
+  type StateFiles,
+} from "./state.js";
 import createDebug from "debug";
 
 const debug = createDebug("mdtest:session");
