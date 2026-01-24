@@ -204,7 +204,7 @@ function positionToLineColumn(
   const lines = text.slice(0, offset).split("\n");
   return {
     line: lines.length,
-    column: lines[lines.length - 1].length + 1,
+    column: lines[lines.length - 1]!.length + 1,
   };
 }
 
@@ -250,19 +250,19 @@ async function testFile(
         // EXCLUDING headings (we output those separately)
         const bodyLines: string[] = [];
         for (let i = lastEndLine; i < blockStartLine; i++) {
-          const line = lines[i];
+          const line = lines[i]!;
           if (line.startsWith("```")) continue; // Skip fence markers
           if (line.startsWith("#")) continue; // Skip headings (we output those separately)
           bodyLines.push(line);
         }
 
         // Trim leading/trailing blank lines but preserve internal structure
-        while (bodyLines.length > 0 && bodyLines[0].trim() === "") {
+        while (bodyLines.length > 0 && bodyLines[0]!.trim() === "") {
           bodyLines.shift();
         }
         while (
           bodyLines.length > 0 &&
-          bodyLines[bodyLines.length - 1].trim() === ""
+          bodyLines[bodyLines.length - 1]!.trim() === ""
         ) {
           bodyLines.pop();
         }
@@ -321,7 +321,7 @@ async function testFile(
 
     // Run all blocks as tests
     for (let i = 0; i < fences.length; i++) {
-      const f = fences[i];
+      const f = fences[i]!;
       total++;
       const { commands, expect } = parseBlock(f.text);
 
@@ -419,24 +419,26 @@ async function testFile(
           (r) => !r.command.startsWith(">"),
         );
         for (let i = 0; i < nonHookResults.length; i++) {
-          const { command, stdout: cmdStdout } = nonHookResults[i];
+          const { command, stdout: cmdStdout } = nonHookResults[i]!;
           // Format multi-line commands with ┊ continuation
           const cmdLines = command.split("\n");
           if (cmdLines.length === 1) {
             console.log(`    \x1b[32m✓\x1b[0m ${maybeTrunc(command)}`);
           } else {
-            console.log(`    \x1b[32m✓\x1b[0m ${maybeTrunc(cmdLines[0])}`);
+            console.log(`    \x1b[32m✓\x1b[0m ${maybeTrunc(cmdLines[0]!)}`);
             for (let j = 1; j < cmdLines.length; j++) {
-              console.log(`    ┊ ${maybeTrunc(cmdLines[j])}`);
+              console.log(`    ┊ ${maybeTrunc(cmdLines[j]!)}`);
             }
           }
-          cmdStdout.forEach((line) => console.log(`      ${maybeTrunc(line)}`));
+          cmdStdout.forEach((line: string) =>
+            console.log(`      ${maybeTrunc(line)}`),
+          );
           // Add blank line between commands only if current command has output or not last
           const hasOutput = cmdStdout.length > 0;
           const isLast = i === nonHookResults.length - 1;
           if (
             !isLast &&
-            (hasOutput || nonHookResults[i + 1].stdout.length > 0)
+            (hasOutput || nonHookResults[i + 1]!.stdout.length > 0)
           ) {
             console.log("");
           }
@@ -468,9 +470,9 @@ async function testFile(
           if (cmdLines.length === 1) {
             console.error(`    \x1b[31m✗\x1b[0m ${maybeTrunc(command)}`);
           } else {
-            console.error(`    \x1b[31m✗\x1b[0m ${maybeTrunc(cmdLines[0])}`);
+            console.error(`    \x1b[31m✗\x1b[0m ${maybeTrunc(cmdLines[0]!)}`);
             for (let j = 1; j < cmdLines.length; j++) {
-              console.error(`    ┊ ${maybeTrunc(cmdLines[j])}`);
+              console.error(`    ┊ ${maybeTrunc(cmdLines[j]!)}`);
             }
           }
         }

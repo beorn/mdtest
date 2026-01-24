@@ -43,8 +43,8 @@ describe("parsing", () => {
         (b) => b.lang === "console" || b.lang === "sh",
       );
       expect(fences).toHaveLength(1);
-      expect(fences[0].lang).toBe("console");
-      expect(fences[0].value).toBe("$ echo hi\nhi");
+      expect(fences[0]!.lang).toBe("console");
+      expect(fences[0]!.value).toBe("$ echo hi\nhi");
     });
 
     test("sh", () => {
@@ -53,7 +53,7 @@ describe("parsing", () => {
       const fences = codeBlocks.filter(
         (b) => b.lang === "console" || b.lang === "sh",
       );
-      expect(fences[0].lang).toBe("sh");
+      expect(fences[0]!.lang).toBe("sh");
     });
 
     test("multiple", () => {
@@ -71,7 +71,7 @@ describe("parsing", () => {
       const fences = codeBlocks.filter(
         (b) => b.lang === "console" || b.lang === "sh",
       );
-      expect(fences[0].meta).toBe("exit=1 cwd=/tmp");
+      expect(fences[0]!.meta).toBe("exit=1 cwd=/tmp");
     });
 
     test("ignores non-shell", () => {
@@ -81,7 +81,7 @@ describe("parsing", () => {
         (b) => b.lang === "console" || b.lang === "sh",
       );
       expect(fences).toHaveLength(1);
-      expect(fences[0].lang).toBe("console");
+      expect(fences[0]!.lang).toBe("console");
     });
   });
 

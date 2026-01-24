@@ -250,7 +250,7 @@ function registerNestedTests(
   }
 
   // Create describe.serial block and recurse to preserve execution order
-  describe.serial(path[depth], () => {
+  describe.serial(path[depth]!, () => {
     registerNestedTests(path, items, session, depth + 1);
   });
 }
@@ -287,7 +287,7 @@ export async function bunShell(
     console.error(`[bunShell] ROOT:`, env.ROOT);
     console.error(`[bunShell] KIMMI_REPO:`, env.KIMMI_REPO);
     // Extract and log the actual command from the script
-    const actualCmd = cmd[2]; // The bash -lc script
+    const actualCmd = cmd[2]!; // The bash -lc script
     const cmdMatch = actualCmd.match(/\nkimmi[^\n]+/);
     if (cmdMatch) console.error(`[bunShell] Command:`, cmdMatch[0].trim());
   }

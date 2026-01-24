@@ -18,12 +18,12 @@ More text
     const { headings } = parseMarkdown(md);
 
     expect(headings).toHaveLength(3);
-    expect(headings[0].text).toBe("Title");
-    expect(headings[0].depth).toBe(1);
-    expect(headings[1].text).toBe("Section 1");
-    expect(headings[1].depth).toBe(2);
-    expect(headings[2].text).toBe("Subsection 1.1");
-    expect(headings[2].depth).toBe(3);
+    expect(headings[0]!.text).toBe("Title");
+    expect(headings[0]!.depth).toBe(1);
+    expect(headings[1]!.text).toBe("Section 1");
+    expect(headings[1]!.depth).toBe(2);
+    expect(headings[2]!.text).toBe("Subsection 1.1");
+    expect(headings[2]!.depth).toBe(3);
   });
 
   test("findNearestHeading returns correct heading for code block", () => {
@@ -48,12 +48,18 @@ $ echo "test 2"
     expect(codeBlocks).toHaveLength(2);
 
     // First code block should be under "Section 1"
-    const heading1 = findNearestHeading(headings, codeBlocks[0].position.start);
+    const heading1 = findNearestHeading(
+      headings,
+      codeBlocks[0]!.position.start,
+    );
     expect(heading1).not.toBeNull();
     expect(heading1?.text).toBe("Section 1");
 
     // Second code block should be under "Section 2"
-    const heading2 = findNearestHeading(headings, codeBlocks[1].position.start);
+    const heading2 = findNearestHeading(
+      headings,
+      codeBlocks[1]!.position.start,
+    );
     expect(heading2).not.toBeNull();
     expect(heading2?.text).toBe("Section 2");
   });
@@ -71,7 +77,7 @@ $ echo "test"
     const { headings, codeBlocks } = parseMarkdown(md);
 
     expect(codeBlocks).toHaveLength(1);
-    const heading = findNearestHeading(headings, codeBlocks[0].position.start);
+    const heading = findNearestHeading(headings, codeBlocks[0]!.position.start);
     expect(heading).toBeNull();
   });
 
@@ -97,11 +103,17 @@ $ echo "section 1"
     expect(codeBlocks).toHaveLength(2);
 
     // First code block under "Setup"
-    const heading1 = findNearestHeading(headings, codeBlocks[0].position.start);
+    const heading1 = findNearestHeading(
+      headings,
+      codeBlocks[0]!.position.start,
+    );
     expect(heading1?.text).toBe("Setup");
 
     // Second code block under "Section 1" (after horizontal rule)
-    const heading2 = findNearestHeading(headings, codeBlocks[1].position.start);
+    const heading2 = findNearestHeading(
+      headings,
+      codeBlocks[1]!.position.start,
+    );
     expect(heading2?.text).toBe("Section 1");
   });
 });

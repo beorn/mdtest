@@ -209,7 +209,7 @@ export function matchLines(
     const e = expected[i];
 
     // Both [...] and ... can match multiple lines when on their own line
-    if (e.trim() === "[...]" || e.trim() === "...") {
+    if (e!.trim() === "[...]" || e!.trim() === "...") {
       const tail = expected.slice(i + 1);
       if (tail.length === 0) return { ok: true };
       for (let k = j; k <= actual.length; k++) {
@@ -229,8 +229,8 @@ export function matchLines(
       };
     }
 
-    const a = actual[j];
-    const { re, keys } = compileExpectedLineToRegex(e, caps);
+    const a = actual[j]!;
+    const { re, keys } = compileExpectedLineToRegex(e!, caps);
     const m = a.match(re);
     if (!m) {
       return {

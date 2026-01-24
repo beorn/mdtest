@@ -39,6 +39,7 @@
     "@commander-js/extra-typings": "^14.0.0",
     "@types/bun": "latest",
     "@types/debug": "^4.1.12",
+    "@types/mdast": "^4.0.4",
     "commander": "^14.0.1",
     "typescript": "latest"
   },
