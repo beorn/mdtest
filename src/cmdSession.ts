@@ -267,4 +267,8 @@ export class CmdSession {
   get isRunning(): boolean {
     return !this.closed && this.proc.exitCode === null;
   }
+
+  async [Symbol.asyncDispose](): Promise<void> {
+    await this.close();
+  }
 }
