@@ -94,7 +94,7 @@ import {
   findNearestHeading,
   generateTestId,
 } from "./markdown.js";
-import { runBlock, callHookIfExists } from "./executor.js";
+import { PluginExecutor } from "./plugin-executor.js";
 import createDebug from "debug";
 
 const debug = createDebug("mdtest:runner");
@@ -169,29 +169,8 @@ if (files.length === 0) {
 debug("Found %d test files", files.length);
 debug("Files: %O", files);
 
-// -------- Global (per-file) persistent context (env + cwd + functions) --------
-import {
-  createStatePaths,
-  ensureStateFiles as ensureStateFilesImpl,
-  clearState as clearStateImpl,
-  type StateFiles,
-} from "./state.js";
+// -------- Constants --------
 import { DEFAULTS } from "./constants.js";
-
-const baseDir = mkdtempSync(join(tmpdir(), "mdtest-"));
-
-// We'll keep one pair of files per *input file path* so parallel files don't collide.
-function statePathsFor(file: string): StateFiles {
-  return createStatePaths(file, baseDir);
-}
-
-function ensureStateFilesLocal(paths: StateFiles) {
-  ensureStateFilesImpl(paths, process.cwd());
-}
-
-function clearStateLocal(paths: StateFiles) {
-  clearStateImpl(paths, process.cwd());
-}
 
 // -------- File processing & snapshot updating --------
 type Replacement = { start: number; end: number; newText: string };
@@ -289,6 +268,10 @@ async function testFile(
       }
     }
 
+    // Initialize plugin executor
+    const executor = new PluginExecutor(testFilePath, md);
+    await executor.initialize(codeBlocks);
+
     // Filter to console/sh blocks and convert to fence format for compatibility
     const fences = codeBlocks
       .filter((block) => block.lang === "console" || block.lang === "sh")
@@ -300,10 +283,6 @@ async function testFile(
         end: block.position.end.offset || 0,
         body: bodyTexts.get(block.position.start.offset || 0),
       }));
-
-    const statePaths = statePathsFor(path);
-    const { envFile, cwdFile, funcFile } = statePaths;
-    ensureStateFilesLocal(statePaths);
 
     // Output file header (markdown format)
     if (!isFirstFile) console.log("\n---\n");
@@ -355,26 +334,32 @@ async function testFile(
 
       const opts = parseInfo(f.info);
       if (opts.reset) {
-        clearStateLocal(statePaths);
         Object.keys(capsStdout).forEach((k) => delete capsStdout[k]);
         Object.keys(capsStderr).forEach((k) => delete capsStderr[k]);
       }
 
-      // Call beforeEach hook if exists
-      await callHookIfExists("beforeEach", envFile, cwdFile, funcFile);
+      // Call beforeEach hook
+      await executor.beforeEach();
 
-      const { stdout, stderr, exitCode, results } = await runBlock(
-        commands,
-        opts,
-        envFile,
-        cwdFile,
-        funcFile,
-        process.cwd(),
+      // Execute block using plugin
+      const blockResult = await executor.executeBlock(
+        { lang: f.lang, info: f.info, text: f.text },
+        nearestHeading,
       );
+
+      // Plugin didn't handle this block - skip it
+      if (!blockResult) {
+        total--;
+        continue;
+      }
+
+      const { results, exitCode } = blockResult;
+      const stdout = results.flatMap((r) => r.stdout);
+      const stderr = results.flatMap((r) => r.stderr);
 
       // Run beforeAll once, after first block that defines it
       if (!beforeAllRan) {
-        await callHookIfExists("beforeAll", envFile, cwdFile, funcFile);
+        await executor.beforeAll();
         beforeAllRan = true;
       }
 
@@ -494,8 +479,8 @@ async function testFile(
         console.error(""); // Blank line after test
       }
 
-      // Call afterEach hook if exists (run even on failure)
-      await callHookIfExists("afterEach", envFile, cwdFile, funcFile);
+      // Call afterEach hook (run even on failure)
+      await executor.afterEach();
 
       // Update logic if test failed
       if (!(outMatch.ok && errMatch.ok && exitOk) && UPDATE) {
@@ -538,8 +523,8 @@ async function testFile(
       }
     }
 
-    // Call afterAll hook if exists (run even on failure)
-    await callHookIfExists("afterAll", envFile, cwdFile, funcFile);
+    // Call afterAll hook (run even on failure)
+    await executor.afterAll();
 
     return { fails: failures, total, replacements };
   } finally {
