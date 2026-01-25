@@ -39,7 +39,7 @@ export async function loadPlugin(
   }
 
   // Relative or absolute path - resolve from test file location
-  const resolved = specifier.startsWith('.')
+  const resolved = specifier.startsWith(".")
     ? resolve(dirname(testFilePath), specifier)
     : specifier; // Bare specifier or absolute path
 
@@ -49,7 +49,7 @@ export async function loadPlugin(
   // Export should be default export
   if (!module.default) {
     throw new Error(
-      `Plugin module ${specifier} must have a default export (got: ${Object.keys(module).join(', ')})`
+      `Plugin module ${specifier} must have a default export (got: ${Object.keys(module).join(", ")})`,
     );
   }
 

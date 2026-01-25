@@ -3,7 +3,11 @@
 
 import type { Plugin, FileOpts, BlockOpts, ReplResult } from "./types.js";
 import { loadPlugin } from "./loader.js";
-import { parseFrontmatter, mergeOptions, parseHeadingOptions } from "./options.js";
+import {
+  parseFrontmatter,
+  mergeOptions,
+  parseHeadingOptions,
+} from "./options.js";
 import { parseInfo } from "./core.js";
 import type { Heading, CodeBlock } from "./markdown.js";
 
@@ -36,7 +40,7 @@ export class PluginExecutor {
     }
 
     // Load plugin (defaults to bash)
-    const pluginSpecifier = (this.frontmatterOpts.plugin as string) ?? 'bash';
+    const pluginSpecifier = (this.frontmatterOpts.plugin as string) ?? "bash";
     const factory = await loadPlugin(pluginSpecifier, this.testFilePath);
 
     // Create plugin instance
@@ -61,7 +65,9 @@ export class PluginExecutor {
     exitCode: number;
   } | null> {
     if (!this.plugin) {
-      throw new Error('PluginExecutor not initialized - call initialize() first');
+      throw new Error(
+        "PluginExecutor not initialized - call initialize() first",
+      );
     }
 
     // Parse block fence options
@@ -95,15 +101,23 @@ export class PluginExecutor {
     const commands = this.extractCommands(block.text);
 
     // Execute each command
-    const results: Array<{ command: string; stdout: string[]; stderr: string[] }> = [];
+    const results: Array<{
+      command: string;
+      stdout: string[];
+      stderr: string[];
+    }> = [];
     let lastExitCode = 0;
 
     for (const cmd of commands) {
       const result = await exec(cmd);
       results.push({
         command: cmd,
-        stdout: result.stdout ? result.stdout.split('\n').filter(l => l !== '') : [],
-        stderr: result.stderr ? result.stderr.split('\n').filter(l => l !== '') : [],
+        stdout: result.stdout
+          ? result.stdout.split("\n").filter((l) => l !== "")
+          : [],
+        stderr: result.stderr
+          ? result.stderr.split("\n").filter((l) => l !== "")
+          : [],
       });
       lastExitCode = result.exitCode;
     }
@@ -171,16 +185,16 @@ export class PluginExecutor {
     const commands: string[] = [];
     let currentCommand: string[] = [];
 
-    for (const line of text.split('\n')) {
-      if (line.startsWith('$')) {
+    for (const line of text.split("\n")) {
+      if (line.startsWith("$")) {
         // New command - save previous if exists
         if (currentCommand.length > 0) {
-          commands.push(currentCommand.join('\n'));
+          commands.push(currentCommand.join("\n"));
           currentCommand = [];
         }
         // Add command without $ prefix
         currentCommand.push(line.slice(1).trimStart());
-      } else if (line.startsWith('>')) {
+      } else if (line.startsWith(">")) {
         // Continuation line
         currentCommand.push(line.slice(1).trimStart());
       }
@@ -189,7 +203,7 @@ export class PluginExecutor {
 
     // Add final command if exists
     if (currentCommand.length > 0) {
-      commands.push(currentCommand.join('\n'));
+      commands.push(currentCommand.join("\n"));
     }
 
     return commands;

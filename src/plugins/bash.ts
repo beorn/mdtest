@@ -8,7 +8,14 @@ import { splitNorm } from "../core.js";
 import { buildScript, buildHookScript } from "../shell.js";
 import { bunShell } from "../integrations/bun.js";
 import { DEFAULTS } from "../constants.js";
-import type { Plugin, PluginFactory, FileOpts, BlockOpts, ExecFn, ReplResult } from "../types.js";
+import type {
+  Plugin,
+  PluginFactory,
+  FileOpts,
+  BlockOpts,
+  ExecFn,
+  ReplResult,
+} from "../types.js";
 
 /**
  * Bash plugin - default mdtest execution mode
@@ -38,7 +45,7 @@ export const bash: PluginFactory = (opts: FileOpts): Plugin => {
       if (opts.file) return null;
 
       // Only handle shell blocks
-      if (!['console', 'sh', 'bash'].includes(opts.type)) {
+      if (!["console", "sh", "bash"].includes(opts.type)) {
         return null;
       }
 
@@ -51,7 +58,8 @@ export const bash: PluginFactory = (opts: FileOpts): Plugin => {
 
       // Return execution function
       return async (cmd: string): Promise<ReplResult> => {
-        const timeout = (opts.timeout as number | undefined) ?? DEFAULTS.TIMEOUT;
+        const timeout =
+          (opts.timeout as number | undefined) ?? DEFAULTS.TIMEOUT;
         const cwd = (opts.cwd as string | undefined) ?? process.cwd();
 
         // Convert BlockOpts to BlockOptions for buildScript
@@ -64,7 +72,13 @@ export const bash: PluginFactory = (opts: FileOpts): Plugin => {
         };
 
         // Build script with state persistence
-        const script = buildScript([cmd], blockOpts, envFile, cwdFile, funcFile);
+        const script = buildScript(
+          [cmd],
+          blockOpts,
+          envFile,
+          cwdFile,
+          funcFile,
+        );
 
         // Execute command
         const res = await bunShell(["bash", "-lc", script], {
@@ -86,8 +100,8 @@ export const bash: PluginFactory = (opts: FileOpts): Plugin => {
         }
 
         return {
-          stdout: stdout.join('\n'),
-          stderr: stderr.join('\n'),
+          stdout: stdout.join("\n"),
+          stderr: stderr.join("\n"),
           exitCode: res.exitCode ?? 0,
         };
       };
@@ -95,19 +109,19 @@ export const bash: PluginFactory = (opts: FileOpts): Plugin => {
 
     // Lifecycle hooks - call bash functions from state
     async beforeAll(): Promise<void> {
-      await callHook('beforeAll');
+      await callHook("beforeAll");
     },
 
     async afterAll(): Promise<void> {
-      await callHook('afterAll');
+      await callHook("afterAll");
     },
 
     async beforeEach(): Promise<void> {
-      await callHook('beforeEach');
+      await callHook("beforeEach");
     },
 
     async afterEach(): Promise<void> {
-      await callHook('afterEach');
+      await callHook("afterEach");
     },
   };
 

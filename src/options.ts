@@ -24,7 +24,7 @@ export function parseFrontmatter(markdown: string): Record<string, unknown> {
   const opts: Record<string, unknown> = {};
 
   // Parse key: value pairs (indented with 2 spaces)
-  for (const line of mdtestYaml.split('\n')) {
+  for (const line of mdtestYaml.split("\n")) {
     const match = line.match(/^\s\s(\w+):\s*(.+)$/);
     if (!match) continue;
 
@@ -33,15 +33,15 @@ export function parseFrontmatter(markdown: string): Record<string, unknown> {
     if (!key || !value) continue;
 
     // Parse value (string, number, boolean, or multiline)
-    if (value === 'true') opts[key] = true;
-    else if (value === 'false') opts[key] = false;
+    if (value === "true") opts[key] = true;
+    else if (value === "false") opts[key] = false;
     else if (/^\d+$/.test(value)) opts[key] = parseInt(value, 10);
-    else if (value.startsWith('|')) {
+    else if (value.startsWith("|")) {
       // Multiline string - collect following indented lines
       opts[key] = value; // Store as-is for now (needs proper multiline handling)
     } else {
       // Remove quotes if present
-      opts[key] = value.replace(/^["']|["']$/g, '');
+      opts[key] = value.replace(/^["']|["']$/g, "");
     }
   }
 
@@ -52,7 +52,9 @@ export function parseFrontmatter(markdown: string): Record<string, unknown> {
  * Parse heading options
  * Format: ## Title {key1=value1 key2 key3=value3}
  */
-export function parseHeadingOptions(headingText: string): Record<string, unknown> {
+export function parseHeadingOptions(
+  headingText: string,
+): Record<string, unknown> {
   const match = headingText.match(/\{([^}]+)\}$/);
   if (!match || !match[1]) return {};
 
@@ -71,7 +73,9 @@ export function parseHeadingOptions(headingText: string): Record<string, unknown
  * Merge options from multiple levels
  * Later levels override earlier levels
  */
-export function mergeOptions(...optionSets: Array<Record<string, unknown>>): Record<string, unknown> {
+export function mergeOptions(
+  ...optionSets: Array<Record<string, unknown>>
+): Record<string, unknown> {
   const merged: Record<string, unknown> = {};
 
   for (const opts of optionSets) {
