@@ -110,6 +110,10 @@ export class PluginExecutor {
 
     for (const cmd of commands) {
       const result = await exec(cmd);
+      // null result means "not handled" - skip this command
+      if (result === null) {
+        continue;
+      }
       results.push({
         command: cmd,
         stdout: result.stdout

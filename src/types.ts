@@ -42,8 +42,9 @@ export interface BlockOpts {
 /**
  * Function to execute a single command
  * Returns stdout, stderr, and exit code
+ * Return null to indicate "not handled" (falls back to next handler)
  */
-export type ExecFn = (cmd: string) => Promise<ReplResult>;
+export type ExecFn = (cmd: string) => Promise<ReplResult | null>;
 
 /**
  * Plugin interface for custom command execution

@@ -60,6 +60,16 @@ export function parseInfo(info: string): BlockOptions {
         if (ek) env[ek] = ev ?? "";
       }
       opts.env = env;
+    } else {
+      // Pass through arbitrary key=value pairs for plugins
+      // Convert "true"/"false" to booleans for convenience
+      if (v === "true") {
+        (opts as Record<string, unknown>)[k] = true;
+      } else if (v === "false") {
+        (opts as Record<string, unknown>)[k] = false;
+      } else {
+        (opts as Record<string, unknown>)[k] = v;
+      }
     }
   }
   return opts;
