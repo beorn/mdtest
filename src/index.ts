@@ -95,6 +95,7 @@ import {
   generateTestId,
 } from "./markdown.js";
 import { PluginExecutor } from "./plugin-executor.js";
+import { stripAnsi } from "./utils.js";
 import createDebug from "debug";
 
 const debug = createDebug("mdtest:runner");
@@ -354,8 +355,8 @@ async function testFile(
       }
 
       const { results, exitCode } = blockResult;
-      const stdout = results.flatMap((r) => r.stdout);
-      const stderr = results.flatMap((r) => r.stderr);
+      const stdout: string[] = results.flatMap((r) => r.stdout.map(stripAnsi));
+      const stderr: string[] = results.flatMap((r) => r.stderr.map(stripAnsi));
 
       // Run beforeAll once, after first block that defines it
       if (!beforeAllRan) {

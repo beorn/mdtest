@@ -22,12 +22,6 @@ import createDebug from "debug";
 
 const debug = createDebug("mdtest:session");
 
-// Strip ANSI escape codes unless FORCE_COLOR is set
-// Pattern matches: SGR codes (\x1b[31m), extended SGR (\x1b[4:3m), OSC 8 hyperlinks
-const ANSI_REGEX = /\x1b\[[0-9;:]*m|\x1b\]8;;[^\x1b]*\x1b\\/g;
-const stripAnsi = (s: string): string =>
-  process.env.FORCE_COLOR ? s : s.replace(ANSI_REGEX, "");
-
 export class TestSession {
   private statePaths: StateFiles;
   private baseDir: string;
@@ -106,8 +100,8 @@ export class TestSession {
 
     const result = await this.shell.execute(["bash", "-lc", script]);
 
-    const stdout = splitNorm(stripAnsi(result.stdout.toString()));
-    const stderr = splitNorm(stripAnsi(result.stderr.toString()));
+    const stdout = splitNorm(result.stdout.toString());
+    const stderr = splitNorm(result.stderr.toString());
 
     // Remove trailing empty lines
     while (stdout.length > 0 && stdout[stdout.length - 1] === "") stdout.pop();
