@@ -43,22 +43,8 @@ export async function loadPlugin(
     ? resolve(dirname(testFilePath), specifier)
     : specifier; // Bare specifier or absolute path
 
-  // Disable TTY before loading plugin to ensure consistent output
-  // (e.g., chalk caches isTTY at module load time)
-  const originalIsTTY = process.stdout.isTTY
-  Object.defineProperty(process.stdout, "isTTY", {
-    value: false,
-    configurable: true,
-  })
-
   // Dynamic import (Bun handles .ts files natively)
   const module = await import(resolved);
-
-  // Restore TTY state
-  Object.defineProperty(process.stdout, "isTTY", {
-    value: originalIsTTY,
-    configurable: true,
-  })
 
   // Export should be default export
   if (!module.default) {
