@@ -263,14 +263,14 @@ Plugins can maintain state across blocks:
 ```typescript
 export default function statefulPlugin(opts: FileOpts): Plugin {
   // File-level state (persists across blocks)
-  let vaultPath: string | null = null
+  let repoPath: string | null = null
   let connection: any = null
 
   return {
     block(blockOpts) {
       // Reset state if requested
       if (blockOpts.reset) {
-        vaultPath = null
+        repoPath = null
         connection?.close()
         connection = null
       }
@@ -278,7 +278,7 @@ export default function statefulPlugin(opts: FileOpts): Plugin {
       return async (cmd: string) => {
         // Use/update state
         if (!connection) {
-          connection = await connect(vaultPath ?? ".")
+          connection = await connect(repoPath ?? ".")
         }
 
         return executeWithConnection(connection, cmd)
