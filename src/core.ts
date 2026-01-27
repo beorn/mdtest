@@ -36,6 +36,8 @@ export function parseInfo(info: string): BlockOptions {
     const k = kv.slice(0, idx);
     const v = kv.slice(idx + 1);
     if (!v) continue;
+    // Skip cmd - it's handled specially above with quoted value extraction
+    if (k === "cmd") continue;
     if (k === "exit") {
       const n = Number(v);
       if (!Number.isNaN(n)) opts.exit = n;
