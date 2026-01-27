@@ -137,6 +137,7 @@ const program = new Command()
     true,
   )
   .option("--no-trunc", "Disable truncation of long lines in output")
+  .option("--dots", "Dots reporter - show dots for passing tests, details only for failures", false)
   .showHelpAfterError("(add --help for additional information)")
   .parse();
 
@@ -145,6 +146,7 @@ const patterns = program.args;
 const UPDATE = opts.update;
 const SHOW_BODY = !opts.hideBody;
 const TRUNCATE = opts.trunc;
+const DOTS = opts.dots;
 
 // Helper to truncate long lines
 function maybeTrunc(line: string): string {
@@ -285,9 +287,11 @@ async function testFile(
         body: bodyTexts.get(block.position.start.offset || 0),
       }));
 
-    // Output file header (markdown format)
-    if (!isFirstFile) console.log("\n---\n");
-    console.log(`${path}:\n`);
+    // Output file header (markdown format) - skip in dots mode
+    if (!DOTS) {
+      if (!isFirstFile) console.log("\n---\n");
+      console.log(`${path}:\n`);
+    }
 
     let failures = 0;
     let total = 0;
@@ -386,62 +390,73 @@ async function testFile(
       const exitOk = exitCode === wantExit;
 
       if (outMatch.ok && errMatch.ok && exitOk) {
-        // Output test heading (markdown format) - only if changed
-        if (headingText !== lastHeadingText) {
-          if (lastHeadingText !== null) console.log("");
-          console.log(`${headingPrefix} ${headingText}`);
-          console.log(""); // Blank line after heading
-          lastHeadingText = headingText;
-        }
+        if (DOTS) {
+          // Dots mode: just print a dot for passing tests
+          process.stdout.write("\x1b[32m.\x1b[0m");
+        } else {
+          // Output test heading (markdown format) - only if changed
+          if (headingText !== lastHeadingText) {
+            if (lastHeadingText !== null) console.log("");
+            console.log(`${headingPrefix} ${headingText}`);
+            console.log(""); // Blank line after heading
+            lastHeadingText = headingText;
+          }
 
-        // Output body text if --show-body is enabled
-        if (f.body) {
-          console.log(f.body);
-          console.log(""); // Blank line after body
-        }
+          // Output body text if --show-body is enabled
+          if (f.body) {
+            console.log(f.body);
+            console.log(""); // Blank line after body
+          }
 
-        // Output each command with its output (indented for markdown)
-        const nonHookResults = results.filter(
-          (r) => !r.command.startsWith(">"),
-        );
-        for (let i = 0; i < nonHookResults.length; i++) {
-          const { command, stdout: cmdStdout } = nonHookResults[i]!;
-          // Format multi-line commands with ┊ continuation
-          const cmdLines = command.split("\n");
-          if (cmdLines.length === 1) {
-            console.log(`    \x1b[32m✓\x1b[0m ${maybeTrunc(command)}`);
-          } else {
-            console.log(`    \x1b[32m✓\x1b[0m ${maybeTrunc(cmdLines[0]!)}`);
-            for (let j = 1; j < cmdLines.length; j++) {
-              console.log(`    ┊ ${maybeTrunc(cmdLines[j]!)}`);
+          // Output each command with its output (indented for markdown)
+          const nonHookResults = results.filter(
+            (r) => !r.command.startsWith(">"),
+          );
+          for (let i = 0; i < nonHookResults.length; i++) {
+            const { command, stdout: cmdStdout } = nonHookResults[i]!;
+            // Format multi-line commands with ┊ continuation
+            const cmdLines = command.split("\n");
+            if (cmdLines.length === 1) {
+              console.log(`    \x1b[32m✓\x1b[0m ${maybeTrunc(command)}`);
+            } else {
+              console.log(`    \x1b[32m✓\x1b[0m ${maybeTrunc(cmdLines[0]!)}`);
+              for (let j = 1; j < cmdLines.length; j++) {
+                console.log(`    ┊ ${maybeTrunc(cmdLines[j]!)}`);
+              }
+            }
+            cmdStdout.forEach((line: string) =>
+              console.log(`      ${maybeTrunc(line)}`),
+            );
+            // Add blank line between commands only if current command has output or not last
+            const hasOutput = cmdStdout.length > 0;
+            const isLast = i === nonHookResults.length - 1;
+            if (
+              !isLast &&
+              (hasOutput || nonHookResults[i + 1]!.stdout.length > 0)
+            ) {
+              console.log("");
             }
           }
-          cmdStdout.forEach((line: string) =>
-            console.log(`      ${maybeTrunc(line)}`),
-          );
-          // Add blank line between commands only if current command has output or not last
-          const hasOutput = cmdStdout.length > 0;
-          const isLast = i === nonHookResults.length - 1;
-          if (
-            !isLast &&
-            (hasOutput || nonHookResults[i + 1]!.stdout.length > 0)
-          ) {
-            console.log("");
-          }
+          console.log(""); // Blank line after test
         }
-        console.log(""); // Blank line after test
       } else {
         failures++;
-        // Output test heading (markdown format) - only if changed
-        if (headingText !== lastHeadingText) {
+
+        // In dots mode, print newline and file context before failure details
+        if (DOTS) {
+          console.error(`\n\n${path}#${testId}:`);
+        }
+
+        // Output test heading (markdown format) - only if changed (skip in dots mode)
+        if (!DOTS && headingText !== lastHeadingText) {
           if (lastHeadingText !== null) console.error("");
           console.error(`${headingPrefix} ${headingText}`);
           console.error(""); // Blank line after heading
           lastHeadingText = headingText;
         }
 
-        // Output body text if --show-body is enabled
-        if (f.body) {
+        // Output body text if --show-body is enabled (skip in dots mode)
+        if (!DOTS && f.body) {
           console.error(f.body);
           console.error(""); // Blank line after body
         }
@@ -570,8 +585,10 @@ async function main() {
   if (UPDATE) for (const u of toUpdate) await applyReplacements(u.path, u.reps);
 
   const ok = fails === 0;
+  // In dots mode, add extra newline before summary
+  const prefix = DOTS ? "\n\n" : "\n";
   console.log(
-    `\n${ok ? "✅" : "❌"} ${total} block(s), ${fails} failed${UPDATE ? " (updated snapshots where needed)" : ""}`,
+    `${prefix}${ok ? "✅" : "❌"} ${total} block(s), ${fails} failed${UPDATE ? " (updated snapshots where needed)" : ""}`,
   );
   process.exit(ok ? 0 : 1);
 }
