@@ -28,6 +28,8 @@ import { DEFAULTS } from "./constants.js";
 // OSC 133 escape sequence patterns (using BEL \x07 as terminator)
 // Pattern to match OSC 133;D with optional exit code: \x1b]133;D;N\x07 or \x1b]133;D\x07
 const OSC_133_D_PATTERN = /\x1b\]133;D(?:;(-?\d+))?\x07/;
+// Pattern to match OSC 133;A (prompt start - REPL is ready for input)
+const OSC_133_A_PATTERN = /\x1b\]133;A\x07/;
 // Pattern to match any OSC 133 sequence for stripping
 const OSC_133_ANY_PATTERN = /\x1b\]133;[A-Z](?:;[^\x07]*)?\x07/g;
 
@@ -156,6 +158,32 @@ export class CmdSession {
   }
 
   /**
+   * Wait for subprocess to be ready by detecting OSC 133;A prompt marker.
+   * This is more robust than a fixed delay as it adapts to actual subprocess startup time.
+   * Falls back to startupDelay timeout if no marker is received.
+   */
+  private async waitForReady(): Promise<void> {
+    const startTime = Date.now();
+    // Use a longer timeout for startup (5 seconds) to handle high-concurrency scenarios
+    const maxStartupWait = Math.max(this.maxWait, 5000);
+
+    while (true) {
+      // Check for OSC 133;A (prompt start marker)
+      if (OSC_133_A_PATTERN.test(this.stdoutBuffer)) {
+        return;
+      }
+
+      const elapsed = Date.now() - startTime;
+      if (elapsed >= maxStartupWait) {
+        // Timeout - proceed anyway, execute() will handle any issues
+        return;
+      }
+
+      await Bun.sleep(10);
+    }
+  }
+
+  /**
    * Execute a command and wait for output with timeout-based completion detection
    *
    * When useOsc133 is enabled, waits for OSC 133;D marker and extracts exit code.
@@ -163,14 +191,24 @@ export class CmdSession {
    */
   async execute(command: string): Promise<ShellResult> {
     // Wait for subprocess to be ready on first execute
-    if (this.firstExecute && this.startupDelay > 0) {
-      await Bun.sleep(this.startupDelay);
+    const isFirstExecute = this.firstExecute;
+    if (isFirstExecute) {
+      if (this.useOsc133) {
+        // For OSC 133 mode, wait for initial prompt marker (more robust than fixed delay)
+        await this.waitForReady();
+      } else if (this.startupDelay > 0) {
+        // For non-OSC 133 mode, use fixed delay
+        await Bun.sleep(this.startupDelay);
+      }
       this.firstExecute = false;
     }
 
-    // Clear buffers
-    this.stdoutBuffer = "";
-    this.stderrBuffer = "";
+    // Clear buffers (but preserve initial prompt for first command in OSC 133 mode)
+    // The initial prompt is expected to be part of the output for first command
+    if (!isFirstExecute || !this.useOsc133) {
+      this.stdoutBuffer = "";
+      this.stderrBuffer = "";
+    }
 
     // Write command to stdin using Bun's FileSink
     // FileSink has write() method that accepts strings or Uint8Array
@@ -196,19 +234,27 @@ export class CmdSession {
       }
 
       // OSC 133 mode: check for completion marker
+      // We need BOTH OSC 133;D (command done) AND OSC 133;A (next prompt ready)
+      // to ensure we capture the full output including the next prompt
       if (this.useOsc133) {
-        const match = this.stdoutBuffer.match(OSC_133_D_PATTERN);
-        if (match) {
-          exitCode = match[1] ? parseInt(match[1], 10) : 0;
-          break;
+        const matchD = this.stdoutBuffer.match(OSC_133_D_PATTERN);
+        if (matchD) {
+          exitCode = matchD[1] ? parseInt(matchD[1], 10) : 0;
+          // Also wait for OSC 133;A (prompt ready) which comes after D
+          // This ensures we capture the next prompt in the output
+          if (OSC_133_A_PATTERN.test(this.stdoutBuffer.slice(matchD.index!))) {
+            break;
+          }
         }
       }
 
       // Silence timeout reached? (only if we have some output)
-      // In OSC 133 mode, this is a fallback for non-compliant REPLs
-      const silenceTime = Date.now() - lastOutputTime;
-      if (silenceTime >= this.minWait && currentLen > 0) {
-        break;
+      // In OSC 133 mode, we rely on markers instead - only use silence for non-OSC 133
+      if (!this.useOsc133) {
+        const silenceTime = Date.now() - lastOutputTime;
+        if (silenceTime >= this.minWait && currentLen > 0) {
+          break;
+        }
       }
 
       // Max timeout reached?
