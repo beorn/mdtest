@@ -1,8 +1,8 @@
-// Bun test integration for .test.md files
+// Vitest test integration for .test.md files
 // Usage: Create a wrapper test file that calls registerMdTests()
 //
 // Example: tests/md.test.ts
-// import { registerMdTests } from '@beorn/mdtest/bun'
+// import { registerMdTests } from '@beorn/mdtest/vitest'
 // await registerMdTests('tests/e2e/**/*.test.md')
 
 import {
@@ -12,7 +12,7 @@ import {
   afterAll,
   beforeEach,
   afterEach,
-} from "bun:test";
+} from "vitest";
 import { glob } from "glob";
 import { basename, isAbsolute, resolve, join } from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -38,7 +38,7 @@ export async function discoverMdTests(
   return glob(pattern);
 }
 
-// Register all .test.md files as Bun tests
+// Register all .test.md files as Vitest tests
 export async function registerMdTests(
   pattern: string | string[] = "**/*.test.md",
 ): Promise<void> {
@@ -50,7 +50,7 @@ export async function registerMdTests(
   for (const file of files) await registerMdTestFile(file);
 }
 
-// Register a single .test.md file as Bun tests
+// Register a single .test.md file as Vitest tests
 export async function registerMdTestFile(filePath: string): Promise<void> {
   // Resolve to absolute path
   const absPath = isAbsolute(filePath) ? filePath : resolve(filePath);
@@ -64,8 +64,15 @@ export async function registerMdTestFile(filePath: string): Promise<void> {
   // Pattern like 'packages/mdtest/tests/*.test.md' → 'features.test.md'
   const displayName = basename(absPath);
 
-  // Register tests with Bun
-  registerBunTests(displayName, absPath, md, structure, codeBlocks, headings);
+  // Register tests with Vitest
+  registerVitestTests(
+    displayName,
+    absPath,
+    md,
+    structure,
+    codeBlocks,
+    headings,
+  );
 }
 
 interface TestStep {
@@ -154,7 +161,7 @@ function buildHeadingPath(
   return path.length > 0 ? path : ["(no heading)"];
 }
 
-function registerBunTests(
+function registerVitestTests(
   displayName: string,
   filePath: string,
   md: string,
@@ -162,9 +169,9 @@ function registerBunTests(
   codeBlocks: CodeBlock[],
   _headings: Heading[],
 ): void {
-  // Wrap entire file in a describe.serial block to prevent parallel execution
+  // Wrap entire file in a describe block with sequential execution
   // (shared plugin state must not be accessed concurrently)
-  describe.serial(displayName, () => {
+  describe(displayName, () => {
     // Create plugin executor for this file
     const executor = new PluginExecutor(filePath, md);
 
@@ -300,7 +307,7 @@ function registerNestedTests(
           testName = testName.slice(0, MAX_TEST_NAME_LENGTH - 3) + "...";
         }
 
-        test.serial(`$ ${testName}`, async () => {
+        test(`$ ${testName}`, async () => {
           // Format command as block text with proper continuation syntax
           // Multi-line commands have newlines in step.cmd that need > prefix
           const cmdLines = step.cmd.split("\n");
@@ -372,8 +379,8 @@ function registerNestedTests(
     return;
   }
 
-  // Create describe.serial block and recurse to preserve execution order
-  describe.serial(path[depth]!, () => {
+  // Create describe block and recurse to preserve execution order
+  describe(path[depth]!, () => {
     registerNestedTests(
       path,
       items,
@@ -385,86 +392,89 @@ function registerNestedTests(
   });
 }
 
-// ============ Shell Adapter (Bun-specific) ============
+// ============ Shell Adapter (Node.js-based for Vitest) ============
 
 /**
- * Execute command via Bun.spawn
+ * Execute command via Node.js spawn (compatible with Vitest environment)
  *
  * @param cmd - Command array (e.g., ['bash', '-lc', script])
  * @param opts - Execution options (cwd, env, timeout)
  * @returns Promise<ShellResult> with stdout, stderr, exitCode
  */
-export async function bunShell(
+export async function vitestShell(
   cmd: string[],
   opts?: ShellOptions,
 ): Promise<ShellResult> {
+  const { spawn } = await import("node:child_process");
   const timeout = opts?.timeout ?? 30000; // Default 30s
 
   // Debug: Log what we're executing
   if (process.env.DEBUG_MDTEST) {
-    console.error(`[bunShell] Executing:`, cmd);
-    console.error(`[bunShell] CWD:`, opts?.cwd ?? process.cwd());
+    console.error(`[vitestShell] Executing:`, cmd);
+    console.error(`[vitestShell] CWD:`, opts?.cwd ?? process.cwd());
     const env = opts?.env ?? (process.env as Record<string, string>);
-    console.error(`[bunShell] ROOT:`, env.ROOT);
-    console.error(`[bunShell] KIMMI_REPO:`, env.KIMMI_REPO);
+    console.error(`[vitestShell] ROOT:`, env.ROOT);
+    console.error(`[vitestShell] KIMMI_REPO:`, env.KIMMI_REPO);
     // Extract and log the actual command from the script
     const actualCmd = cmd[2]!; // The bash -lc script
     const cmdMatch = actualCmd.match(/\nkimmi[^\n]+/);
-    if (cmdMatch) console.error(`[bunShell] Command:`, cmdMatch[0].trim());
+    if (cmdMatch) console.error(`[vitestShell] Command:`, cmdMatch[0].trim());
   }
 
-  // Spawn process using Bun.spawn
-  const proc = Bun.spawn(cmd, {
-    cwd: opts?.cwd ?? process.cwd(),
-    env: opts?.env ?? (process.env as Record<string, string>),
-    stdout: "pipe",
-    stderr: "pipe",
-  });
+  return new Promise((resolve, reject) => {
+    const proc = spawn(cmd[0]!, cmd.slice(1), {
+      cwd: opts?.cwd ?? process.cwd(),
+      env: opts?.env ?? (process.env as Record<string, string>),
+      stdio: ["ignore", "pipe", "pipe"],
+    });
 
-  // Implement timeout using Promise.race
-  const processPromise = (async () => {
-    // Read streams and wait for exit concurrently
-    // This prevents streams from being closed before we read them
-    const [stdout, stderr, exitCode] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-      proc.exited,
-    ]);
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
 
-    if (process.env.DEBUG_MDTEST) {
-      console.error(`[bunShell] Result:`);
-      console.error(`[bunShell]   stdout length: ${stdout.length}`);
-      console.error(`[bunShell]   stderr length: ${stderr.length}`);
-      console.error(`[bunShell]   exitCode: ${exitCode}`);
-      console.error(
-        `[bunShell]   stdout preview: ${JSON.stringify(stdout.slice(0, 100))}`,
-      );
-    }
+    proc.stdout?.on("data", (chunk: Buffer) => {
+      stdoutChunks.push(chunk);
+    });
 
-    return {
-      stdout: Buffer.from(stdout),
-      stderr: Buffer.from(stderr),
-      exitCode: exitCode,
-    };
-  })();
+    proc.stderr?.on("data", (chunk: Buffer) => {
+      stderrChunks.push(chunk);
+    });
 
-  const timeoutPromise = new Promise<never>((_resolve, reject) => {
-    setTimeout(() => reject(new Error("TIMEOUT")), timeout);
-  });
-
-  try {
-    return await Promise.race([processPromise, timeoutPromise]);
-  } catch (err: unknown) {
-    if (err instanceof Error && err.message === "TIMEOUT") {
-      // Kill the process
+    // Timeout handler
+    const timer = setTimeout(() => {
       proc.kill();
-
-      return {
+      resolve({
         stdout: Buffer.from(""),
         stderr: Buffer.from(`Command timed out after ${timeout}ms`),
         exitCode: 124, // Standard timeout exit code
-      };
-    }
-    throw err;
-  }
+      });
+    }, timeout);
+
+    proc.on("close", (exitCode) => {
+      clearTimeout(timer);
+
+      const stdout = Buffer.concat(stdoutChunks);
+      const stderr = Buffer.concat(stderrChunks);
+
+      if (process.env.DEBUG_MDTEST) {
+        console.error(`[vitestShell] Result:`);
+        console.error(`[vitestShell]   stdout length: ${stdout.length}`);
+        console.error(`[vitestShell]   stderr length: ${stderr.length}`);
+        console.error(`[vitestShell]   exitCode: ${exitCode}`);
+        console.error(
+          `[vitestShell]   stdout preview: ${JSON.stringify(stdout.toString("utf8").slice(0, 100))}`,
+        );
+      }
+
+      resolve({
+        stdout,
+        stderr,
+        exitCode: exitCode ?? 0,
+      });
+    });
+
+    proc.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
 }

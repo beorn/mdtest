@@ -138,6 +138,7 @@ const program = new Command()
   )
   .option("--no-trunc", "Disable truncation of long lines in output")
   .option("--dots", "Dots reporter - show dots for passing tests, details only for failures", false)
+  .option("--tap", "TAP reporter - output Test Anything Protocol format", false)
   .showHelpAfterError("(add --help for additional information)")
   .parse();
 
@@ -147,6 +148,7 @@ const UPDATE = opts.update;
 const SHOW_BODY = !opts.hideBody;
 const TRUNCATE = opts.trunc;
 const DOTS = opts.dots;
+const TAP = opts.tap;
 
 // Helper to truncate long lines
 function maybeTrunc(line: string): string {
@@ -287,10 +289,15 @@ async function testFile(
         body: bodyTexts.get(block.position.start.offset || 0),
       }));
 
-    // Output file header (markdown format) - skip in dots mode
-    if (!DOTS) {
+    // Output file header (markdown format) - skip in dots/TAP mode
+    if (!DOTS && !TAP) {
       if (!isFirstFile) console.log("\n---\n");
       console.log(`${path}:\n`);
+    }
+
+    // TAP header (only on first file, plan written at end)
+    if (TAP && isFirstFile) {
+      console.log("TAP version 14");
     }
 
     let failures = 0;
@@ -390,7 +397,10 @@ async function testFile(
       const exitOk = exitCode === wantExit;
 
       if (outMatch.ok && errMatch.ok && exitOk) {
-        if (DOTS) {
+        if (TAP) {
+          // TAP mode: ok line
+          console.log(`ok ${total} - ${testName}`);
+        } else if (DOTS) {
           // Dots mode: just print a dot for passing tests
           process.stdout.write("\x1b[32m.\x1b[0m");
         } else {
@@ -442,57 +452,71 @@ async function testFile(
       } else {
         failures++;
 
-        // In dots mode, print newline and file context before failure details
-        if (DOTS) {
+        // TAP mode: not ok line with YAML diagnostics
+        if (TAP) {
+          console.log(`not ok ${total} - ${testName}`);
+          console.log("  ---");
+          if (!outMatch.ok) {
+            console.log(`  message: stdout mismatch`);
+          } else if (!errMatch.ok) {
+            console.log(`  message: stderr mismatch`);
+          } else if (!exitOk) {
+            console.log(`  message: exit code ${exitCode}, expected ${wantExit}`);
+          }
+          console.log("  ...");
+        } else if (DOTS) {
+          // In dots mode, print newline and file context before failure details
           console.error(`\n\n${path}#${testId}:`);
         }
 
-        // Output test heading (markdown format) - only if changed (skip in dots mode)
-        if (!DOTS && headingText !== lastHeadingText) {
+        // Output test heading (markdown format) - only if changed (skip in dots/TAP mode)
+        if (!DOTS && !TAP && headingText !== lastHeadingText) {
           if (lastHeadingText !== null) console.error("");
           console.error(`${headingPrefix} ${headingText}`);
           console.error(""); // Blank line after heading
           lastHeadingText = headingText;
         }
 
-        // Output body text if --show-body is enabled (skip in dots mode)
-        if (!DOTS && f.body) {
+        // Output body text if --show-body is enabled (skip in dots/TAP mode)
+        if (!DOTS && !TAP && f.body) {
           console.error(f.body);
           console.error(""); // Blank line after body
         }
 
-        // Output each command with failure indicator (indented for markdown)
-        const nonHookResults = results.filter(
-          (r) => !r.command.startsWith(">"),
-        );
-        for (const { command } of nonHookResults) {
-          // Format multi-line commands with ┊ continuation
-          const cmdLines = command.split("\n");
-          if (cmdLines.length === 1) {
-            console.error(`    \x1b[31m✗\x1b[0m ${maybeTrunc(command)}`);
-          } else {
-            console.error(`    \x1b[31m✗\x1b[0m ${maybeTrunc(cmdLines[0]!)}`);
-            for (let j = 1; j < cmdLines.length; j++) {
-              console.error(`    ┊ ${maybeTrunc(cmdLines[j]!)}`);
+        // Output each command with failure indicator (indented for markdown) - skip in TAP mode
+        if (!TAP) {
+          const nonHookResults = results.filter(
+            (r) => !r.command.startsWith(">"),
+          );
+          for (const { command } of nonHookResults) {
+            // Format multi-line commands with ┊ continuation
+            const cmdLines = command.split("\n");
+            if (cmdLines.length === 1) {
+              console.error(`    \x1b[31m✗\x1b[0m ${maybeTrunc(command)}`);
+            } else {
+              console.error(`    \x1b[31m✗\x1b[0m ${maybeTrunc(cmdLines[0]!)}`);
+              for (let j = 1; j < cmdLines.length; j++) {
+                console.error(`    ┊ ${maybeTrunc(cmdLines[j]!)}`);
+              }
             }
           }
-        }
-        console.error(""); // Blank line before error details
+          console.error(""); // Blank line before error details
 
-        if (!outMatch.ok) {
-          console.error(
-            hintMismatch("stdout", wantStdout, stdout, outMatch.msg),
-          );
+          if (!outMatch.ok) {
+            console.error(
+              hintMismatch("stdout", wantStdout, stdout, outMatch.msg),
+            );
+          }
+          if (!errMatch.ok) {
+            console.error(
+              hintMismatch("stderr", wantStderr, stderr, errMatch.msg),
+            );
+          }
+          if (!exitOk) {
+            console.error(`exit code: expected ${wantExit}, got ${exitCode}`);
+          }
+          console.error(""); // Blank line after test
         }
-        if (!errMatch.ok) {
-          console.error(
-            hintMismatch("stderr", wantStderr, stderr, errMatch.msg),
-          );
-        }
-        if (!exitOk) {
-          console.error(`exit code: expected ${wantExit}, got ${exitCode}`);
-        }
-        console.error(""); // Blank line after test
       }
 
       // Call afterEach hook (run even on failure)
@@ -585,11 +609,17 @@ async function main() {
   if (UPDATE) for (const u of toUpdate) await applyReplacements(u.path, u.reps);
 
   const ok = fails === 0;
-  // In dots mode, add extra newline before summary
-  const prefix = DOTS ? "\n\n" : "\n";
-  console.log(
-    `${prefix}${ok ? "✅" : "❌"} ${total} block(s), ${fails} failed${UPDATE ? " (updated snapshots where needed)" : ""}`,
-  );
+
+  if (TAP) {
+    // TAP mode: output plan at end
+    console.log(`1..${total}`);
+  } else {
+    // In dots mode, add extra newline before summary
+    const prefix = DOTS ? "\n\n" : "\n";
+    console.log(
+      `${prefix}${ok ? "✅" : "❌"} ${total} block(s), ${fails} failed${UPDATE ? " (updated snapshots where needed)" : ""}`,
+    );
+  }
   process.exit(ok ? 0 : 1);
 }
 

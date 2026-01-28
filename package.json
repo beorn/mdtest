@@ -10,7 +10,8 @@
     ".": "./src/index.ts",
     "./api": "./src/api.ts",
     "./session": "./src/session.ts",
-    "./bun": "./src/integrations/bun.ts"
+    "./bun": "./src/integrations/bun.ts",
+    "./vitest": "./src/integrations/vitest.ts"
   },
   "scripts": {
     "test": "bun src/index.ts tests/example.test.md tests/features.test.md",

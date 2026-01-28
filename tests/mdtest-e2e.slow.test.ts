@@ -1,5 +1,5 @@
-// Wrapper to register mdtest's own .test.md files with Vitest
-import { registerMdTests } from "../src/integrations/vitest.js";
+// Wrapper to register mdtest's own .test.md files with Bun test runner
+import { registerMdTests } from "../src/integrations/bun.js";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
