@@ -11,7 +11,14 @@
     "./api": "./src/api.ts",
     "./session": "./src/session.ts",
     "./bun": "./src/integrations/bun.ts",
-    "./vitest": "./src/integrations/vitest.ts"
+    "./vitest": "./src/integrations/vitest.ts",
+    "./vitest-plugin": "./src/integrations/vitest-plugin.ts",
+    "./types": "./src/types.ts",
+    "./shell": "./src/shell.ts",
+    "./core": "./src/core.ts",
+    "./constants": "./src/constants.ts",
+    "./cmdSession": "./src/cmdSession.ts",
+    "./plugins/bash": "./src/plugins/bash.ts"
   },
   "scripts": {
     "test": "bun src/index.ts tests/example.test.md tests/features.test.md",
@@ -42,7 +49,9 @@
     "@types/debug": "^4.1.12",
     "@types/mdast": "^4.0.4",
     "commander": "^14.0.1",
-    "typescript": "latest"
+    "typescript": "latest",
+    "vite": "^6.0.0",
+    "vitest": "^3.0.0"
   },
   "dependencies": {
     "debug": "^4.4.3",
