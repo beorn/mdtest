@@ -414,9 +414,11 @@ export async function bunShell(
   }
 
   // Spawn process using Bun.spawn
+  // TERM=dumb prevents shell from emitting escape sequences (bracketed paste mode, etc.)
+  const baseEnv = opts?.env ?? (process.env as Record<string, string>);
   const proc = Bun.spawn(cmd, {
     cwd: opts?.cwd ?? process.cwd(),
-    env: opts?.env ?? (process.env as Record<string, string>),
+    env: { ...baseEnv, TERM: "dumb" },
     stdout: "pipe",
     stderr: "pipe",
   });

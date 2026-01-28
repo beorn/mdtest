@@ -96,6 +96,8 @@ export class CmdSession {
       env: {
         ...process.env,
         ...opts.env,
+        // TERM=dumb prevents shell from emitting escape sequences (bracketed paste mode, etc.)
+        TERM: "dumb",
         // Enable OSC 133 shell integration in subprocess
         ...(this.useOsc133 ? { TERM_SHELL_INTEGRATION: "1" } : {}),
       },
