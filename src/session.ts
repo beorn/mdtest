@@ -18,9 +18,7 @@ import {
   ensureStateFiles,
   type StateFiles,
 } from "./state.js";
-import createDebug from "debug";
-
-const debug = createDebug("mdtest:session");
+import { logSession } from "./logger.js";
 
 export class TestSession {
   private statePaths: StateFiles;
@@ -63,10 +61,10 @@ export class TestSession {
    */
   addHelperFile(filename: string, content: string): void {
     const filepath = join(this.testTempDir, filename);
-    debug("Creating file: %s", filepath);
-    debug("Content length: %d bytes", content.length);
+    logSession.debug?.("Creating file: %s", filepath);
+    logSession.debug?.("Content length: %d bytes", content.length);
     writeFileSync(filepath, content, "utf8");
-    debug("File written successfully");
+    logSession.debug?.("File written successfully");
 
     // Check if this is a lifecycle hook
     const hookNames = ["beforeAll", "beforeEach", "afterEach", "afterAll"];

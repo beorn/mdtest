@@ -96,10 +96,7 @@ import {
 } from "./markdown.js";
 import { PluginExecutor } from "./plugin-executor.js";
 import { stripAnsi } from "./utils.js";
-import createDebug from "debug";
-
-const debug = createDebug("mdtest:runner");
-const debugFiles = createDebug("mdtest:files");
+import { log, logFiles } from "./logger.js";
 
 // -------- Version Helper --------
 async function getVersion(): Promise<string> {
@@ -171,8 +168,8 @@ if (files.length === 0) {
   process.exit(2);
 }
 
-debug("Found %d test files", files.length);
-debug("Files: %O", files);
+log.debug?.("Found %d test files", files.length);
+log.debug?.("Files: %O", files);
 
 // -------- Constants --------
 import { DEFAULTS } from "./constants.js";
@@ -196,12 +193,12 @@ async function testFile(
   path: string,
   isFirstFile: boolean,
 ): Promise<{ fails: number; total: number; replacements: Replacement[] }> {
-  debug("Testing file: %s", path);
+  log.debug?.("Testing file: %s", path);
 
   // ADR-004: Auto-chdir to temp directory for test isolation
   const originalCwd = process.cwd();
   const testTempDir = mkdtempSync(join(tmpdir(), "mdtest-"));
-  debug("Created temp directory: %s", testTempDir);
+  log.debug?.("Created temp directory: %s", testTempDir);
 
   // Set ROOT to original project root for tests to reference source
   if (!process.env.ROOT) process.env.ROOT = originalCwd;
@@ -209,10 +206,10 @@ async function testFile(
   try {
     // Read test file from original path (before chdir)
     const testFilePath = isAbsolute(path) ? path : join(originalCwd, path);
-    debug("Reading test file: %s", testFilePath);
+    log.debug?.("Reading test file: %s", testFilePath);
     const md = await readFile(testFilePath, "utf8");
     const { headings, codeBlocks } = parseMarkdown(md);
-    debug(
+    log.debug?.(
       "Parsed %d headings, %d code blocks",
       headings.length,
       codeBlocks.length,
@@ -266,10 +263,10 @@ async function testFile(
     for (const block of codeBlocks) {
       if (block.filename) {
         const filepath = join(testTempDir, block.filename);
-        debugFiles("Creating file: %s", filepath);
-        debugFiles("Content length: %d bytes", block.value.length);
+        logFiles.debug?.("Creating file: %s", filepath);
+        logFiles.debug?.("Content length: %d bytes", block.value.length);
         writeFileSync(filepath, block.value, "utf8");
-        debugFiles("File written successfully");
+        logFiles.debug?.("File written successfully");
       }
     }
 
