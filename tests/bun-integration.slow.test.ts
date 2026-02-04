@@ -1,22 +1,22 @@
 // Integration tests: Verify bun test integration behavior
-import { describe, test, expect, beforeAll, afterAll } from "vitest";
-import { writeFileSync, unlinkSync, mkdtempSync } from "fs";
-import { join, dirname } from "path";
-import { tmpdir } from "os";
-import { $ } from "bun";
-import { fileURLToPath } from "url";
+import { describe, test, expect, beforeAll, afterAll } from "vitest"
+import { writeFileSync, unlinkSync, mkdtempSync } from "fs"
+import { join, dirname } from "path"
+import { tmpdir } from "os"
+import { $ } from "bun"
+import { fileURLToPath } from "url"
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const mdtestCli = join(__dirname, "../src/index.ts");
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const mdtestCli = join(__dirname, "../src/index.ts")
 
 describe("bun integration", () => {
   describe("error output formatting", () => {
-    let tempFile: string;
-    let tempDir: string;
+    let tempFile: string
+    let tempDir: string
 
     beforeAll(() => {
-      tempDir = mkdtempSync(join(tmpdir(), "mdtest-error-test-"));
-      tempFile = join(tempDir, "test-error.md");
+      tempDir = mkdtempSync(join(tmpdir(), "mdtest-error-test-"))
+      tempFile = join(tempDir, "test-error.md")
 
       // Create a test markdown file that will fail
       const testContent = `
@@ -28,49 +28,49 @@ describe("bun integration", () => {
 $ echo "hello"
 goodbye
 \`\`\`
-`;
-      writeFileSync(tempFile, testContent, "utf8");
-    });
+`
+      writeFileSync(tempFile, testContent, "utf8")
+    })
 
     afterAll(() => {
       try {
-        unlinkSync(tempFile);
+        unlinkSync(tempFile)
       } catch {}
-    });
+    })
 
     test("error output should be clean without stack traces", async () => {
       // Run mdtest on the failing test file and capture both stdout and stderr
       const proc = Bun.spawn(["bun", mdtestCli, tempFile], {
         stdout: "pipe",
         stderr: "pipe",
-      });
+      })
       const [stdout, stderr] = await Promise.all([
         new Response(proc.stdout).text(),
         new Response(proc.stderr).text(),
-      ]);
-      const result = stdout + stderr;
+      ])
+      const result = stdout + stderr
 
       // Should show expected/actual diff
-      expect(result).toContain("expected");
-      expect(result).toContain("actual");
+      expect(result).toContain("expected")
+      expect(result).toContain("actual")
 
       // Should show the failing test content
-      expect(result).toContain("hello");
-      expect(result).toContain("goodbye");
+      expect(result).toContain("hello")
+      expect(result).toContain("goodbye")
 
       // Should NOT contain raw stack traces from internal code
       // (Some path info is acceptable in test output, but not internal stack frames)
-      expect(result).not.toContain("at processTicksAndRejections");
-    });
-  });
+      expect(result).not.toContain("at processTicksAndRejections")
+    })
+  })
 
   describe("heading hierarchy", () => {
-    let tempFile: string;
-    let tempDir: string;
+    let tempFile: string
+    let tempDir: string
 
     beforeAll(() => {
-      tempDir = mkdtempSync(join(tmpdir(), "mdtest-heading-test-"));
-      tempFile = join(tempDir, "test.md");
+      tempDir = mkdtempSync(join(tmpdir(), "mdtest-heading-test-"))
+      tempFile = join(tempDir, "test.md")
 
       // Create a test markdown file with clear heading structure
       const testContent = `
@@ -103,33 +103,33 @@ test A.1
 $ echo "test B"
 test B
 \`\`\`
-`;
-      writeFileSync(tempFile, testContent, "utf8");
-    });
+`
+      writeFileSync(tempFile, testContent, "utf8")
+    })
 
     afterAll(() => {
       try {
-        unlinkSync(tempFile);
+        unlinkSync(tempFile)
       } catch {}
-    });
+    })
 
     test("verify describe block nesting matches heading hierarchy", async () => {
       // Run mdtest on the test file and check output shows proper heading hierarchy
       const result = await $`bun ${mdtestCli} ${tempFile}`
         .nothrow()
         .quiet()
-        .text();
+        .text()
 
       // Should show proper heading structure in output
-      expect(result).toContain("Setup");
-      expect(result).toContain("Section A");
-      expect(result).toContain("Subsection A.1");
-      expect(result).toContain("Section B");
+      expect(result).toContain("Setup")
+      expect(result).toContain("Section A")
+      expect(result).toContain("Subsection A.1")
+      expect(result).toContain("Section B")
 
       // All tests should pass (output contains checkmarks or success indicator)
-      expect(result).toContain("✓");
+      expect(result).toContain("✓")
       // Should NOT show "(no heading)" - that indicates broken heading detection
-      expect(result).not.toContain("(no heading)");
-    });
-  });
-});
+      expect(result).not.toContain("(no heading)")
+    })
+  })
+})

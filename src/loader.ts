@@ -1,9 +1,9 @@
 // Plugin loader for mdtest
 // Handles resolution and loading of built-in and custom plugins
 
-import { resolve, dirname } from "node:path";
-import type { PluginFactory } from "./types.js";
-import { bash } from "./plugins/bash.js";
+import { resolve, dirname } from "node:path"
+import type { PluginFactory } from "./types.js"
+import { bash } from "./plugins/bash.js"
 
 /**
  * Built-in plugins
@@ -11,7 +11,7 @@ import { bash } from "./plugins/bash.js";
 const BUILTIN_PLUGINS: Record<string, PluginFactory> = {
   bash,
   sh: bash, // alias
-};
+}
 
 /**
  * Load a plugin by specifier
@@ -31,27 +31,27 @@ export async function loadPlugin(
 ): Promise<PluginFactory> {
   // Built-in plugin?
   if (specifier in BUILTIN_PLUGINS) {
-    const plugin = BUILTIN_PLUGINS[specifier];
+    const plugin = BUILTIN_PLUGINS[specifier]
     if (!plugin) {
-      throw new Error(`Built-in plugin ${specifier} not found`);
+      throw new Error(`Built-in plugin ${specifier} not found`)
     }
-    return plugin;
+    return plugin
   }
 
   // Relative or absolute path - resolve from test file location
   const resolved = specifier.startsWith(".")
     ? resolve(dirname(testFilePath), specifier)
-    : specifier; // Bare specifier or absolute path
+    : specifier // Bare specifier or absolute path
 
   // Dynamic import (Bun handles .ts files natively)
-  const module = await import(resolved);
+  const module = await import(resolved)
 
   // Export should be default export
   if (!module.default) {
     throw new Error(
       `Plugin module ${specifier} must have a default export (got: ${Object.keys(module).join(", ")})`,
-    );
+    )
   }
 
-  return module.default;
+  return module.default
 }

@@ -19,7 +19,7 @@ function createFallbackLogger(namespace: string): ConditionalLogger {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const createDebug = require("debug") as (
-      ns: string
+      ns: string,
     ) => DebugFn & { enabled: boolean }
     const debug = createDebug(namespace)
     return { debug: debug.enabled ? debug : undefined }

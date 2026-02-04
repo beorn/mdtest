@@ -36,10 +36,10 @@ export default function myPlugin(fileOpts: FileOpts): Plugin {
     },
 
     // Optional: lifecycle hooks
-    async beforeAll(): Promise<void> { },
-    async afterAll(): Promise<void> { },
-    async beforeEach(): Promise<void> { },
-    async afterEach(): Promise<void> { },
+    async beforeAll(): Promise<void> {},
+    async afterAll(): Promise<void> {},
+    async beforeEach(): Promise<void> {},
+    async afterEach(): Promise<void> {},
   }
 }
 ```
@@ -49,24 +49,24 @@ export default function myPlugin(fileOpts: FileOpts): Plugin {
 ```typescript
 // File-level options passed to plugin factory
 interface FileOpts {
-  path: string                    // Test file path
-  files: Map<string, string>     // file= blocks
-  [key: string]: unknown         // Frontmatter options
+  path: string // Test file path
+  files: Map<string, string> // file= blocks
+  [key: string]: unknown // Frontmatter options
 }
 
 // Block-level options passed to block() method
 interface BlockOpts {
-  type: string                   // Block language (console, sh, bash)
-  content: string                // Raw block text
-  heading: string[]              // Heading path
-  [key: string]: unknown         // Merged options (frontmatter + heading + fence)
+  type: string // Block language (console, sh, bash)
+  content: string // Raw block text
+  heading: string[] // Heading path
+  [key: string]: unknown // Merged options (frontmatter + heading + fence)
 }
 
 // Command execution result
 interface ReplResult {
-  stdout: string                 // Command output
-  stderr: string                 // Error output
-  exitCode: number               // Exit code (0 = success)
+  stdout: string // Command output
+  stderr: string // Error output
+  exitCode: number // Exit code (0 = success)
 }
 ```
 
@@ -92,6 +92,7 @@ expected output
 ```
 
 Plugin resolution:
+
 - **Relative path** (starts with `./` or `../`): resolved relative to test file
 - **Built-in** name (`bash`): uses built-in plugin
 - **Bare specifier** (`@scope/package`): resolved from node_modules
@@ -104,12 +105,12 @@ Options cascade from multiple levels:
 ---
 mdtest:
   plugin: ./plugin.ts
-  fixture: default     # File-level
+  fixture: default # File-level
 ---
 
-## Test Suite {fixture=two-columns}  # Heading-level
+## Test Suite {fixture=two-columns} # Heading-level
 
-\`\`\`console fixture=custom reset   # Fence-level
+\`\`\`console fixture=custom reset # Fence-level
 $ command
 \`\`\`
 ```
@@ -130,11 +131,14 @@ export default function myPlugin(opts: FileOpts): Plugin {
   }
 
   // Custom handling for pure commands
-  return { /* ... */ }
+  return {
+    /* ... */
+  }
 }
 ```
 
 Features:
+
 - State persistence (env vars, cwd, bash functions)
 - Hook support (beforeAll, afterEach, etc.)
 - Continuation lines (`>`)
@@ -200,6 +204,7 @@ inbox.md
 ## Performance Benefits
 
 **Before (bash subprocess per command):**
+
 ```
 222 commands × 200ms overhead = ~44 seconds
 Actual test logic: ~3 seconds
@@ -207,6 +212,7 @@ Total: ~47 seconds
 ```
 
 **After (in-process execution):**
+
 ```
 222 commands × ~20ms (bun shell) = ~4 seconds
 Actual test logic: ~3 seconds
@@ -214,6 +220,7 @@ Total: ~7 seconds (~7x speedup)
 ```
 
 **With true in-process (planned):**
+
 ```
 222 commands × ~1ms = ~0.2 seconds
 Actual test logic: ~3 seconds
@@ -249,7 +256,9 @@ export default function myPlugin(opts: FileOpts): Plugin {
       await sharedResource.dispose()
     },
 
-    block(opts) { /* ... */ },
+    block(opts) {
+      /* ... */
+    },
   }
 }
 ```
@@ -298,7 +307,7 @@ export default function selectivePlugin(opts: FileOpts): Plugin {
     block(blockOpts) {
       // Let bash handle setup blocks
       if (blockOpts.heading.includes("Setup")) {
-        return null  // Fall back to bash
+        return null // Fall back to bash
       }
 
       // Handle application blocks in-process
@@ -325,6 +334,7 @@ DEBUG=mdtest:* bun run mdtest test.md
 ```
 
 This shows:
+
 - Plugin loading
 - Block handling decisions
 - Command execution
@@ -333,6 +343,7 @@ This shows:
 ## Future Enhancements
 
 Planned features:
+
 - Plugin composition (chain multiple plugins)
 - Built-in plugins for common tools (npm, git, etc.)
 - Snapshot testing support

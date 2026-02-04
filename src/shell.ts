@@ -1,20 +1,20 @@
 // Shared shell execution abstraction and helpers for mdtest
 // Allows mdtest core to work with different runtimes (Bun, Node.js, Deno)
 
-import type { BlockOptions } from "./api.js";
+import type { BlockOptions } from "./api.js"
 
 // ============ Shell Adapter Interface ============
 
 export interface ShellResult {
-  stdout: Buffer;
-  stderr: Buffer;
-  exitCode: number;
+  stdout: Buffer
+  stderr: Buffer
+  exitCode: number
 }
 
 export interface ShellOptions {
-  cwd?: string;
-  env?: Record<string, string>;
-  timeout?: number; // milliseconds
+  cwd?: string
+  env?: Record<string, string>
+  timeout?: number // milliseconds
 }
 
 /**
@@ -28,7 +28,7 @@ export interface ShellAdapter {
    * @param opts - Execution options (cwd, env, timeout)
    * @returns Promise<ShellResult> with stdout, stderr, exitCode
    */
-  execute(cmd: string[], opts?: ShellOptions): Promise<ShellResult>;
+  execute(cmd: string[], opts?: ShellOptions): Promise<ShellResult>
 }
 
 // ============ Shell Script Builders ============
@@ -37,8 +37,8 @@ export interface ShellAdapter {
  * Escape a string for safe use in shell commands
  */
 export function shellEscape(s: string): string {
-  if (/^[A-Za-z0-9_/.:-]*$/.test(s)) return s;
-  return `'${s.replace(/'/g, `'\\''`)}'`;
+  if (/^[A-Za-z0-9_/.:-]*$/.test(s)) return s
+  return `'${s.replace(/'/g, `'\\''`)}'`
 }
 
 /**
@@ -56,35 +56,35 @@ export function buildScript(
   cwdFile: string,
   funcFile: string,
 ): string {
-  const pre: string[] = [];
-  const post: string[] = [];
+  const pre: string[] = []
+  const post: string[] = []
 
   // Load previous state
-  pre.push("set +e"); // runner checks exit codes itself
-  pre.push(`if [ -f "${envFile}" ]; then set -a; . "${envFile}"; set +a; fi`);
+  pre.push("set +e") // runner checks exit codes itself
+  pre.push(`if [ -f "${envFile}" ]; then set -a; . "${envFile}"; set +a; fi`)
   pre.push(
     `if [ -f "${cwdFile}" ]; then cd "$(cat "${cwdFile}")" 2>/dev/null || true; fi`,
-  );
-  pre.push(`if [ -f "${funcFile}" ]; then . "${funcFile}"; fi`);
+  )
+  pre.push(`if [ -f "${funcFile}" ]; then . "${funcFile}"; fi`)
 
   // Apply block options
-  if (opts.cwd) pre.push(`cd ${shellEscape(opts.cwd)}`);
+  if (opts.cwd) pre.push(`cd ${shellEscape(opts.cwd)}`)
   if (opts.env) {
     for (const [k, v] of Object.entries(opts.env)) {
-      pre.push(`export ${k}=${shellEscape(v)}`);
+      pre.push(`export ${k}=${shellEscape(v)}`)
     }
   }
 
-  const body = commands.join("\n");
+  const body = commands.join("\n")
 
   // Save updated state
-  post.push("_EXIT=$?");
-  post.push(`pwd > "${cwdFile}"`);
-  post.push(`export -p | sed -E 's/^declare -x //g' > "${envFile}"`);
-  post.push(`declare -f > "${funcFile}"`);
-  post.push("exit $_EXIT");
+  post.push("_EXIT=$?")
+  post.push(`pwd > "${cwdFile}"`)
+  post.push(`export -p | sed -E 's/^declare -x //g' > "${envFile}"`)
+  post.push(`declare -f > "${funcFile}"`)
+  post.push("exit $_EXIT")
 
-  return [...pre, body, ...post].join("\n").trim() + "\n";
+  return [...pre, body, ...post].join("\n").trim() + "\n"
 }
 
 /**
@@ -110,5 +110,5 @@ export function buildHookScript(
       declare -f > "${funcFile}"
       exit $_EXIT
     fi
-  `;
+  `
 }

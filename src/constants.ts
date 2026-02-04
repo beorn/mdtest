@@ -33,4 +33,4 @@ export const DEFAULTS = {
     /** Milliseconds to wait for subprocess to be ready */
     STARTUP_DELAY: 300,
   },
-} as const;
+} as const

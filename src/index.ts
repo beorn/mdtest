@@ -75,38 +75,38 @@
 //
 // -----------------------------------------------------------------------------
 
-import { readFile, writeFile } from "node:fs/promises";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, dirname, isAbsolute } from "node:path";
-import { fileURLToPath } from "node:url";
-import { glob } from "glob";
-import { Command } from "@commander-js/extra-typings";
+import { readFile, writeFile } from "node:fs/promises"
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join, dirname, isAbsolute } from "node:path"
+import { fileURLToPath } from "node:url"
+import { glob } from "glob"
+import { Command } from "@commander-js/extra-typings"
 import {
   parseInfo,
   parseBlock,
   matchLines,
   hasPatterns,
   hintMismatch,
-} from "./core.js";
+} from "./core.js"
 import {
   parseMarkdown,
   findNearestHeading,
   generateTestId,
-} from "./markdown.js";
-import { PluginExecutor } from "./plugin-executor.js";
-import { stripAnsi } from "./utils.js";
-import { log, logFiles } from "./logger.js";
+} from "./markdown.js"
+import { PluginExecutor } from "./plugin-executor.js"
+import { stripAnsi } from "./utils.js"
+import { log, logFiles } from "./logger.js"
 
 // -------- Version Helper --------
 async function getVersion(): Promise<string> {
-  const __dirname = dirname(fileURLToPath(import.meta.url));
+  const __dirname = dirname(fileURLToPath(import.meta.url))
   const packageJson = JSON.parse(
     await readFile(join(__dirname, "../package.json"), "utf-8"),
   ) as {
-    version: string;
-  };
-  return packageJson.version;
+    version: string
+  }
+  return packageJson.version
 }
 
 // -------- CLI Setup --------
@@ -134,145 +134,149 @@ const program = new Command()
     true,
   )
   .option("--no-trunc", "Disable truncation of long lines in output")
-  .option("--dots", "Dots reporter - show dots for passing tests, details only for failures", false)
+  .option(
+    "--dots",
+    "Dots reporter - show dots for passing tests, details only for failures",
+    false,
+  )
   .option("--tap", "TAP reporter - output Test Anything Protocol format", false)
   .showHelpAfterError("(add --help for additional information)")
-  .parse();
+  .parse()
 
-const opts = program.opts();
-const patterns = program.args;
-const UPDATE = opts.update;
-const SHOW_BODY = !opts.hideBody;
-const TRUNCATE = opts.trunc;
-const DOTS = opts.dots;
-const TAP = opts.tap;
+const opts = program.opts()
+const patterns = program.args
+const UPDATE = opts.update
+const SHOW_BODY = !opts.hideBody
+const TRUNCATE = opts.trunc
+const DOTS = opts.dots
+const TAP = opts.tap
 
 // Helper to truncate long lines
 function maybeTrunc(line: string): string {
-  if (!TRUNCATE || line.length <= DEFAULTS.TRUNCATE_WIDTH) return line;
-  return line.slice(0, DEFAULTS.TRUNCATE_WIDTH - 3) + "...";
+  if (!TRUNCATE || line.length <= DEFAULTS.TRUNCATE_WIDTH) return line
+  return line.slice(0, DEFAULTS.TRUNCATE_WIDTH - 3) + "..."
 }
 
 // Expand glob patterns (handles both shell-expanded and quoted patterns)
-const files: string[] = [];
+const files: string[] = []
 for (const pattern of patterns) {
-  const matches = await glob(pattern, { nodir: true });
+  const matches = await glob(pattern, { nodir: true })
   if (matches.length === 0) {
     // If no glob match, treat as literal file path (preserves shell behavior)
-    files.push(pattern);
-  } else files.push(...matches);
+    files.push(pattern)
+  } else files.push(...matches)
 }
 
 if (files.length === 0) {
-  console.error("Error: No test files found matching patterns:", patterns);
-  process.exit(2);
+  console.error("Error: No test files found matching patterns:", patterns)
+  process.exit(2)
 }
 
-log.debug?.("Found %d test files", files.length);
-log.debug?.("Files: %O", files);
+log.debug?.("Found %d test files", files.length)
+log.debug?.("Files: %O", files)
 
 // -------- Constants --------
-import { DEFAULTS } from "./constants.js";
+import { DEFAULTS } from "./constants.js"
 
 // -------- File processing & snapshot updating --------
-type Replacement = { start: number; end: number; newText: string };
+type Replacement = { start: number; end: number; newText: string }
 
 // Helper to convert character position to line/column
 function positionToLineColumn(
   text: string,
   offset: number,
 ): { line: number; column: number } {
-  const lines = text.slice(0, offset).split("\n");
+  const lines = text.slice(0, offset).split("\n")
   return {
     line: lines.length,
     column: lines[lines.length - 1]!.length + 1,
-  };
+  }
 }
 
 async function testFile(
   path: string,
   isFirstFile: boolean,
 ): Promise<{ fails: number; total: number; replacements: Replacement[] }> {
-  log.debug?.("Testing file: %s", path);
+  log.debug?.("Testing file: %s", path)
 
   // ADR-004: Auto-chdir to temp directory for test isolation
-  const originalCwd = process.cwd();
-  const testTempDir = mkdtempSync(join(tmpdir(), "mdtest-"));
-  log.debug?.("Created temp directory: %s", testTempDir);
+  const originalCwd = process.cwd()
+  const testTempDir = mkdtempSync(join(tmpdir(), "mdtest-"))
+  log.debug?.("Created temp directory: %s", testTempDir)
 
   // Set ROOT to original project root for tests to reference source
-  if (!process.env.ROOT) process.env.ROOT = originalCwd;
+  if (!process.env.ROOT) process.env.ROOT = originalCwd
 
   try {
     // Read test file from original path (before chdir)
-    const testFilePath = isAbsolute(path) ? path : join(originalCwd, path);
-    log.debug?.("Reading test file: %s", testFilePath);
-    const md = await readFile(testFilePath, "utf8");
-    const { headings, codeBlocks } = parseMarkdown(md);
+    const testFilePath = isAbsolute(path) ? path : join(originalCwd, path)
+    log.debug?.("Reading test file: %s", testFilePath)
+    const md = await readFile(testFilePath, "utf8")
+    const { headings, codeBlocks } = parseMarkdown(md)
     log.debug?.(
       "Parsed %d headings, %d code blocks",
       headings.length,
       codeBlocks.length,
-    );
+    )
 
     // Extract ALL markdown content (for --show-body)
     // This includes: frontmatter, paragraphs between code blocks (but NOT headings)
-    const bodyTexts = new Map<number, string>();
+    const bodyTexts = new Map<number, string>()
     if (SHOW_BODY) {
-      const lines = md.split("\n");
-      let lastEndLine = 0;
+      const lines = md.split("\n")
+      let lastEndLine = 0
 
       for (const block of codeBlocks) {
-        if (block.lang !== "console" && block.lang !== "sh") continue;
+        if (block.lang !== "console" && block.lang !== "sh") continue
 
-        const blockStartLine = block.position.start.line - 1; // 0-indexed
+        const blockStartLine = block.position.start.line - 1 // 0-indexed
 
         // Collect all lines from last code block end to this code block start
         // EXCLUDING headings (we output those separately)
-        const bodyLines: string[] = [];
+        const bodyLines: string[] = []
         for (let i = lastEndLine; i < blockStartLine; i++) {
-          const line = lines[i]!;
-          if (line.startsWith("```")) continue; // Skip fence markers
-          if (line.startsWith("#")) continue; // Skip headings (we output those separately)
-          bodyLines.push(line);
+          const line = lines[i]!
+          if (line.startsWith("```")) continue // Skip fence markers
+          if (line.startsWith("#")) continue // Skip headings (we output those separately)
+          bodyLines.push(line)
         }
 
         // Trim leading/trailing blank lines but preserve internal structure
         while (bodyLines.length > 0 && bodyLines[0]!.trim() === "") {
-          bodyLines.shift();
+          bodyLines.shift()
         }
         while (
           bodyLines.length > 0 &&
           bodyLines[bodyLines.length - 1]!.trim() === ""
         ) {
-          bodyLines.pop();
+          bodyLines.pop()
         }
 
         if (bodyLines.length > 0) {
-          bodyTexts.set(block.position.start.offset || 0, bodyLines.join("\n"));
+          bodyTexts.set(block.position.start.offset || 0, bodyLines.join("\n"))
         }
 
-        lastEndLine = block.position.end.line; // Ready for next iteration
+        lastEndLine = block.position.end.line // Ready for next iteration
       }
     }
 
     // Change to temp directory BEFORE creating helper files
-    process.chdir(testTempDir);
+    process.chdir(testTempDir)
 
     // Create helper files from file= blocks (must happen after chdir)
     for (const block of codeBlocks) {
       if (block.filename) {
-        const filepath = join(testTempDir, block.filename);
-        logFiles.debug?.("Creating file: %s", filepath);
-        logFiles.debug?.("Content length: %d bytes", block.value.length);
-        writeFileSync(filepath, block.value, "utf8");
-        logFiles.debug?.("File written successfully");
+        const filepath = join(testTempDir, block.filename)
+        logFiles.debug?.("Creating file: %s", filepath)
+        logFiles.debug?.("Content length: %d bytes", block.value.length)
+        writeFileSync(filepath, block.value, "utf8")
+        logFiles.debug?.("File written successfully")
       }
     }
 
     // Initialize plugin executor
-    const executor = new PluginExecutor(testFilePath, md);
-    await executor.initialize(codeBlocks);
+    const executor = new PluginExecutor(testFilePath, md)
+    await executor.initialize(codeBlocks)
 
     // Filter to console/sh blocks and convert to fence format for compatibility
     const fences = codeBlocks
@@ -284,100 +288,100 @@ async function testFile(
         start: block.position.start.offset || 0,
         end: block.position.end.offset || 0,
         body: bodyTexts.get(block.position.start.offset || 0),
-      }));
+      }))
 
     // Output file header (markdown format) - skip in dots/TAP mode
     if (!DOTS && !TAP) {
-      if (!isFirstFile) console.log("\n---\n");
-      console.log(`${path}:\n`);
+      if (!isFirstFile) console.log("\n---\n")
+      console.log(`${path}:\n`)
     }
 
     // TAP header (only on first file, plan written at end)
     if (TAP && isFirstFile) {
-      console.log("TAP version 14");
+      console.log("TAP version 14")
     }
 
-    let failures = 0;
-    let total = 0;
-    const replacements: Replacement[] = [];
-    let beforeAllRan = false;
-    const capsStdout: Record<string, string> = {};
-    const capsStderr: Record<string, string> = {};
-    const headingBlockCounts = new Map<string, number>();
-    const seenTestIds = new Set<string>();
-    let lastHeadingText: string | null = null;
+    let failures = 0
+    let total = 0
+    const replacements: Replacement[] = []
+    let beforeAllRan = false
+    const capsStdout: Record<string, string> = {}
+    const capsStderr: Record<string, string> = {}
+    const headingBlockCounts = new Map<string, number>()
+    const seenTestIds = new Set<string>()
+    let lastHeadingText: string | null = null
 
     // Run all blocks as tests
     for (let i = 0; i < fences.length; i++) {
-      const f = fences[i]!;
-      total++;
-      const { commands, expect } = parseBlock(f.text);
+      const f = fences[i]!
+      total++
+      const { commands, expect } = parseBlock(f.text)
 
       // Generate test ID from nearest heading
-      const blockStartPos = positionToLineColumn(md, f.start);
-      const nearestHeading = findNearestHeading(headings, blockStartPos);
-      const testId = generateTestId(nearestHeading, i, headingBlockCounts);
-      const testName = `${path}#${testId}`;
-      const headingText = nearestHeading?.text ?? testId;
-      const headingDepth = nearestHeading?.depth ?? 1;
-      const headingPrefix = "#".repeat(headingDepth);
+      const blockStartPos = positionToLineColumn(md, f.start)
+      const nearestHeading = findNearestHeading(headings, blockStartPos)
+      const testId = generateTestId(nearestHeading, i, headingBlockCounts)
+      const testName = `${path}#${testId}`
+      const headingText = nearestHeading?.text ?? testId
+      const headingDepth = nearestHeading?.depth ?? 1
+      const headingPrefix = "#".repeat(headingDepth)
 
       // Validate for duplicate test IDs
       if (seenTestIds.has(testId)) {
-        console.error(`\n❌ ERROR: Duplicate test ID detected: "${testId}"`);
-        console.error(`   Test IDs must be unique within a file.`);
+        console.error(`\n❌ ERROR: Duplicate test ID detected: "${testId}"`)
+        console.error(`   Test IDs must be unique within a file.`)
         console.error(
           `   This usually happens when two code blocks are at the same heading level.`,
-        );
+        )
         console.error(
           `   Consider adding subheadings or unique identifiers to distinguish tests.\n`,
-        );
-        process.exit(1);
+        )
+        process.exit(1)
       }
-      seenTestIds.add(testId);
+      seenTestIds.add(testId)
 
       if (!commands.length) {
-        total--;
-        continue;
+        total--
+        continue
       }
 
-      const opts = parseInfo(f.info);
+      const opts = parseInfo(f.info)
       if (opts.reset) {
-        Object.keys(capsStdout).forEach((k) => delete capsStdout[k]);
-        Object.keys(capsStderr).forEach((k) => delete capsStderr[k]);
+        Object.keys(capsStdout).forEach((k) => delete capsStdout[k])
+        Object.keys(capsStderr).forEach((k) => delete capsStderr[k])
       }
 
       // Call beforeEach hook
-      await executor.beforeEach();
+      await executor.beforeEach()
 
       // Execute block using plugin
       const blockResult = await executor.executeBlock(
         { lang: f.lang, info: f.info, text: f.text },
         nearestHeading,
-      );
+      )
 
       // Plugin didn't handle this block - skip it
       if (!blockResult) {
-        total--;
-        continue;
+        total--
+        continue
       }
 
-      const { results, exitCode } = blockResult;
-      const stdout: string[] = results.flatMap((r) => r.stdout.map(stripAnsi));
-      const stderr: string[] = results.flatMap((r) => r.stderr.map(stripAnsi));
+      const { results, exitCode } = blockResult
+      const stdout: string[] = results.flatMap((r) => r.stdout.map(stripAnsi))
+      const stderr: string[] = results.flatMap((r) => r.stderr.map(stripAnsi))
 
       // Run beforeAll once, after first block that defines it
       if (!beforeAllRan) {
-        await executor.beforeAll();
-        beforeAllRan = true;
+        await executor.beforeAll()
+        beforeAllRan = true
       }
 
-      const wantExit = expect.exit ?? opts.exit ?? 0;
+      const wantExit = expect.exit ?? opts.exit ?? 0
 
-      const wantStdout = expect.stdout;
-      const wantStderr = expect.stderr.length ? expect.stderr : [];
+      const wantStdout = expect.stdout
+      const wantStderr = expect.stderr.length ? expect.stderr : []
 
-      const outMatch = matchLines(wantStdout, stdout, capsStdout);
+      const outMatch = matchLines(wantStdout, stdout, capsStdout)
       const errMatch =
         expect.stderr.length === 0
           ? matchLines(
@@ -389,135 +393,137 @@ async function testFile(
               wantStderr,
               stderr.filter((l) => l.length),
               capsStderr,
-            );
+            )
 
-      const exitOk = exitCode === wantExit;
+      const exitOk = exitCode === wantExit
 
       if (outMatch.ok && errMatch.ok && exitOk) {
         if (TAP) {
           // TAP mode: ok line
-          console.log(`ok ${total} - ${testName}`);
+          console.log(`ok ${total} - ${testName}`)
         } else if (DOTS) {
           // Dots mode: just print a dot for passing tests
-          process.stdout.write("\x1b[32m.\x1b[0m");
+          process.stdout.write("\x1b[32m.\x1b[0m")
         } else {
           // Output test heading (markdown format) - only if changed
           if (headingText !== lastHeadingText) {
-            if (lastHeadingText !== null) console.log("");
-            console.log(`${headingPrefix} ${headingText}`);
-            console.log(""); // Blank line after heading
-            lastHeadingText = headingText;
+            if (lastHeadingText !== null) console.log("")
+            console.log(`${headingPrefix} ${headingText}`)
+            console.log("") // Blank line after heading
+            lastHeadingText = headingText
           }
 
           // Output body text if --show-body is enabled
           if (f.body) {
-            console.log(f.body);
-            console.log(""); // Blank line after body
+            console.log(f.body)
+            console.log("") // Blank line after body
           }
 
           // Output each command with its output (indented for markdown)
           const nonHookResults = results.filter(
             (r) => !r.command.startsWith(">"),
-          );
+          )
           for (let i = 0; i < nonHookResults.length; i++) {
-            const { command, stdout: cmdStdout } = nonHookResults[i]!;
+            const { command, stdout: cmdStdout } = nonHookResults[i]!
             // Format multi-line commands with ┊ continuation
-            const cmdLines = command.split("\n");
+            const cmdLines = command.split("\n")
             if (cmdLines.length === 1) {
-              console.log(`    \x1b[32m✓\x1b[0m ${maybeTrunc(command)}`);
+              console.log(`    \x1b[32m✓\x1b[0m ${maybeTrunc(command)}`)
             } else {
-              console.log(`    \x1b[32m✓\x1b[0m ${maybeTrunc(cmdLines[0]!)}`);
+              console.log(`    \x1b[32m✓\x1b[0m ${maybeTrunc(cmdLines[0]!)}`)
               for (let j = 1; j < cmdLines.length; j++) {
-                console.log(`    ┊ ${maybeTrunc(cmdLines[j]!)}`);
+                console.log(`    ┊ ${maybeTrunc(cmdLines[j]!)}`)
               }
             }
             cmdStdout.forEach((line: string) =>
               console.log(`      ${maybeTrunc(line)}`),
-            );
+            )
             // Add blank line between commands only if current command has output or not last
-            const hasOutput = cmdStdout.length > 0;
-            const isLast = i === nonHookResults.length - 1;
+            const hasOutput = cmdStdout.length > 0
+            const isLast = i === nonHookResults.length - 1
             if (
               !isLast &&
               (hasOutput || nonHookResults[i + 1]!.stdout.length > 0)
             ) {
-              console.log("");
+              console.log("")
             }
           }
-          console.log(""); // Blank line after test
+          console.log("") // Blank line after test
         }
       } else {
-        failures++;
+        failures++
 
         // TAP mode: not ok line with YAML diagnostics
         if (TAP) {
-          console.log(`not ok ${total} - ${testName}`);
-          console.log("  ---");
+          console.log(`not ok ${total} - ${testName}`)
+          console.log("  ---")
           if (!outMatch.ok) {
-            console.log(`  message: stdout mismatch`);
+            console.log(`  message: stdout mismatch`)
           } else if (!errMatch.ok) {
-            console.log(`  message: stderr mismatch`);
+            console.log(`  message: stderr mismatch`)
           } else if (!exitOk) {
-            console.log(`  message: exit code ${exitCode}, expected ${wantExit}`);
+            console.log(
+              `  message: exit code ${exitCode}, expected ${wantExit}`,
+            )
           }
-          console.log("  ...");
+          console.log("  ...")
         } else if (DOTS) {
           // In dots mode, print newline and file context before failure details
-          console.error(`\n\n${path}#${testId}:`);
+          console.error(`\n\n${path}#${testId}:`)
         }
 
         // Output test heading (markdown format) - only if changed (skip in dots/TAP mode)
         if (!DOTS && !TAP && headingText !== lastHeadingText) {
-          if (lastHeadingText !== null) console.error("");
-          console.error(`${headingPrefix} ${headingText}`);
-          console.error(""); // Blank line after heading
-          lastHeadingText = headingText;
+          if (lastHeadingText !== null) console.error("")
+          console.error(`${headingPrefix} ${headingText}`)
+          console.error("") // Blank line after heading
+          lastHeadingText = headingText
         }
 
         // Output body text if --show-body is enabled (skip in dots/TAP mode)
         if (!DOTS && !TAP && f.body) {
-          console.error(f.body);
-          console.error(""); // Blank line after body
+          console.error(f.body)
+          console.error("") // Blank line after body
         }
 
         // Output each command with failure indicator (indented for markdown) - skip in TAP mode
         if (!TAP) {
           const nonHookResults = results.filter(
             (r) => !r.command.startsWith(">"),
-          );
+          )
           for (const { command } of nonHookResults) {
             // Format multi-line commands with ┊ continuation
-            const cmdLines = command.split("\n");
+            const cmdLines = command.split("\n")
             if (cmdLines.length === 1) {
-              console.error(`    \x1b[31m✗\x1b[0m ${maybeTrunc(command)}`);
+              console.error(`    \x1b[31m✗\x1b[0m ${maybeTrunc(command)}`)
             } else {
-              console.error(`    \x1b[31m✗\x1b[0m ${maybeTrunc(cmdLines[0]!)}`);
+              console.error(`    \x1b[31m✗\x1b[0m ${maybeTrunc(cmdLines[0]!)}`)
               for (let j = 1; j < cmdLines.length; j++) {
-                console.error(`    ┊ ${maybeTrunc(cmdLines[j]!)}`);
+                console.error(`    ┊ ${maybeTrunc(cmdLines[j]!)}`)
               }
             }
           }
-          console.error(""); // Blank line before error details
+          console.error("") // Blank line before error details
 
           if (!outMatch.ok) {
             console.error(
               hintMismatch("stdout", wantStdout, stdout, outMatch.msg),
-            );
+            )
           }
           if (!errMatch.ok) {
             console.error(
               hintMismatch("stderr", wantStderr, stderr, errMatch.msg),
-            );
+            )
           }
           if (!exitOk) {
-            console.error(`exit code: expected ${wantExit}, got ${exitCode}`);
+            console.error(`exit code: expected ${wantExit}, got ${exitCode}`)
           }
-          console.error(""); // Blank line after test
+          console.error("") // Blank line after test
         }
       }
 
       // Call afterEach hook (run even on failure)
-      await executor.afterEach();
+      await executor.afterEach()
 
       // Update logic if test failed
       if (!(outMatch.ok && errMatch.ok && exitOk) && UPDATE) {
@@ -525,29 +531,29 @@ async function testFile(
         if (hasPatterns(f.text)) {
           console.error(
             `⚠️  ${testName} contains patterns - updating anyway (patterns will be replaced)`,
-          );
+          )
           console.error(
             `   Patterns found: wildcards {{...}}, regex /.../, or ellipsis ...`,
-          );
-          console.error(`   Review changes carefully before committing`);
+          )
+          console.error(`   Review changes carefully before committing`)
         }
 
         // Rebuild the fence with actual output
-        const rebuilt: string[] = [];
+        const rebuilt: string[] = []
         // keep commands and continuations
         for (const c of f.text.split("\n")) {
-          if (c.startsWith("$ ") || c.startsWith("> ")) rebuilt.push(c);
+          if (c.startsWith("$ ") || c.startsWith("> ")) rebuilt.push(c)
         }
 
         // stdout
-        if (stdout.length) rebuilt.push(...stdout);
+        if (stdout.length) rebuilt.push(...stdout)
         // stderr (only if non-empty)
-        const nonBlankErr = stderr.filter((l) => l.length);
+        const nonBlankErr = stderr.filter((l) => l.length)
         if (nonBlankErr.length) {
-          for (const l of stderr) rebuilt.push(l.length ? `! ${l}` : l);
+          for (const l of stderr) rebuilt.push(l.length ? `! ${l}` : l)
         }
         // exit code
-        if (exitCode !== 0) rebuilt.push(`[${exitCode}]`);
+        if (exitCode !== 0) rebuilt.push(`[${exitCode}]`)
 
         const newFence =
           "```" +
@@ -555,22 +561,22 @@ async function testFile(
           (f.info ? " " + f.info : "") +
           "\n" +
           rebuilt.join("\n") +
-          "\n```";
-        replacements.push({ start: f.start, end: f.end, newText: newFence });
+          "\n```"
+        replacements.push({ start: f.start, end: f.end, newText: newFence })
       }
     }
 
     // Call afterAll hook (run even on failure)
-    await executor.afterAll();
+    await executor.afterAll()
 
-    return { fails: failures, total, replacements };
+    return { fails: failures, total, replacements }
   } finally {
     // ADR-004: Restore original working directory and cleanup temp directory
-    process.chdir(originalCwd);
+    process.chdir(originalCwd)
 
     // Cleanup temp directory (future: add --keep-temp flag to preserve for debugging)
     try {
-      rmSync(testTempDir, { recursive: true, force: true });
+      rmSync(testTempDir, { recursive: true, force: true })
     } catch {
       // Ignore cleanup errors (temp will be cleaned by OS eventually)
     }
@@ -578,49 +584,49 @@ async function testFile(
 }
 
 async function applyReplacements(path: string, reps: Replacement[]) {
-  if (reps.length === 0) return;
-  let md = await readFile(path, "utf8");
-  reps.sort((a, b) => b.start - a.start); // apply back-to-front
-  for (const r of reps) md = md.slice(0, r.start) + r.newText + md.slice(r.end);
-  await writeFile(path, md, "utf8");
+  if (reps.length === 0) return
+  let md = await readFile(path, "utf8")
+  reps.sort((a, b) => b.start - a.start) // apply back-to-front
+  for (const r of reps) md = md.slice(0, r.start) + r.newText + md.slice(r.end)
+  await writeFile(path, md, "utf8")
 }
 
 async function main() {
-  let fails = 0;
-  let total = 0;
-  const toUpdate: { path: string; reps: Replacement[] }[] = [];
-  let isFirstFile = true;
+  let fails = 0
+  let total = 0
+  const toUpdate: { path: string; reps: Replacement[] }[] = []
+  let isFirstFile = true
 
   for (const f of files) {
     const {
       fails: ff,
       total: tt,
       replacements: reps,
-    } = await testFile(f, isFirstFile);
-    fails += ff;
-    total += tt;
-    if (UPDATE && reps.length) toUpdate.push({ path: f, reps });
-    isFirstFile = false;
+    } = await testFile(f, isFirstFile)
+    fails += ff
+    total += tt
+    if (UPDATE && reps.length) toUpdate.push({ path: f, reps })
+    isFirstFile = false
   }
 
-  if (UPDATE) for (const u of toUpdate) await applyReplacements(u.path, u.reps);
+  if (UPDATE) for (const u of toUpdate) await applyReplacements(u.path, u.reps)
 
-  const ok = fails === 0;
+  const ok = fails === 0
 
   if (TAP) {
     // TAP mode: output plan at end
-    console.log(`1..${total}`);
+    console.log(`1..${total}`)
   } else {
     // In dots mode, add extra newline before summary
-    const prefix = DOTS ? "\n\n" : "\n";
+    const prefix = DOTS ? "\n\n" : "\n"
     console.log(
       `${prefix}${ok ? "✅" : "❌"} ${total} block(s), ${fails} failed${UPDATE ? " (updated snapshots where needed)" : ""}`,
-    );
+    )
   }
-  process.exit(ok ? 0 : 1);
+  process.exit(ok ? 0 : 1)
 }
 
-void main();
+void main()
 
 // -----------------------------------------------------------------------------
 // Future ideas (not implemented; keeping notes here):

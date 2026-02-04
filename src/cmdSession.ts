@@ -21,74 +21,74 @@
  * The REPL must emit these sequences when TERM_SHELL_INTEGRATION=1 is set.
  */
 
-import type { Subprocess } from "bun";
-import type { ShellResult } from "./shell.js";
-import { DEFAULTS } from "./constants.js";
+import type { Subprocess } from "bun"
+import type { ShellResult } from "./shell.js"
+import { DEFAULTS } from "./constants.js"
 
 // OSC 133 escape sequence patterns (using BEL \x07 as terminator)
 // Pattern to match OSC 133;D with optional exit code: \x1b]133;D;N\x07 or \x1b]133;D\x07
-const OSC_133_D_PATTERN = /\x1b\]133;D(?:;(-?\d+))?\x07/;
+const OSC_133_D_PATTERN = /\x1b\]133;D(?:;(-?\d+))?\x07/
 // Pattern to match OSC 133;A (prompt start - REPL is ready for input)
-const OSC_133_A_PATTERN = /\x1b\]133;A\x07/;
+const OSC_133_A_PATTERN = /\x1b\]133;A\x07/
 // Pattern to match any OSC 133 sequence for stripping
-const OSC_133_ANY_PATTERN = /\x1b\]133;[A-Z](?:;[^\x07]*)?\x07/g;
+const OSC_133_ANY_PATTERN = /\x1b\]133;[A-Z](?:;[^\x07]*)?\x07/g
 
 export interface CmdSessionOpts {
-  cwd?: string;
-  env?: Record<string, string>;
-  minWait?: number; // ms of silence to wait (default: 100)
-  maxWait?: number; // max ms total (default: 2000)
-  startupDelay?: number; // ms to wait for subprocess to be ready (default: 0)
-  useOsc133?: boolean; // If true, detect OSC 133;D marker instead of silence (default: false)
+  cwd?: string
+  env?: Record<string, string>
+  minWait?: number // ms of silence to wait (default: 100)
+  maxWait?: number // max ms total (default: 2000)
+  startupDelay?: number // ms to wait for subprocess to be ready (default: 0)
+  useOsc133?: boolean // If true, detect OSC 133;D marker instead of silence (default: false)
   // State files for loading bash session state
-  envFile?: string;
-  cwdFile?: string;
-  funcFile?: string;
+  envFile?: string
+  cwdFile?: string
+  funcFile?: string
 }
 
 export class CmdSession {
   // Use explicit type for subprocess with piped stdin/stdout/stderr
-  private proc: Subprocess<"pipe", "pipe", "pipe">;
-  private stdoutBuffer: string = "";
-  private stderrBuffer: string = "";
-  private minWait: number;
-  private maxWait: number;
-  private startupDelay: number;
-  private useOsc133: boolean;
-  private firstExecute = true;
-  private closed = false;
+  private proc: Subprocess<"pipe", "pipe", "pipe">
+  private stdoutBuffer: string = ""
+  private stderrBuffer: string = ""
+  private minWait: number
+  private maxWait: number
+  private startupDelay: number
+  private useOsc133: boolean
+  private firstExecute = true
+  private closed = false
 
   // Track reader promises for cleanup
-  private stdoutReader: Promise<void> | null = null;
-  private stderrReader: Promise<void> | null = null;
+  private stdoutReader: Promise<void> | null = null
+  private stderrReader: Promise<void> | null = null
 
   constructor(cmd: string, opts: CmdSessionOpts = {}) {
-    this.minWait = opts.minWait ?? DEFAULTS.CMD_SESSION.MIN_WAIT;
-    this.maxWait = opts.maxWait ?? DEFAULTS.CMD_SESSION.MAX_WAIT;
-    this.startupDelay = opts.startupDelay ?? DEFAULTS.CMD_SESSION.STARTUP_DELAY;
-    this.useOsc133 = opts.useOsc133 ?? false;
+    this.minWait = opts.minWait ?? DEFAULTS.CMD_SESSION.MIN_WAIT
+    this.maxWait = opts.maxWait ?? DEFAULTS.CMD_SESSION.MAX_WAIT
+    this.startupDelay = opts.startupDelay ?? DEFAULTS.CMD_SESSION.STARTUP_DELAY
+    this.useOsc133 = opts.useOsc133 ?? false
 
     // Build wrapper script that loads session state before running the cmd
-    const prelude: string[] = ["set +e"];
+    const prelude: string[] = ["set +e"]
     if (opts.envFile) {
       prelude.push(
         `if [ -f "${opts.envFile}" ]; then set -a; . "${opts.envFile}"; set +a; fi`,
-      );
+      )
     }
     if (opts.cwdFile) {
       prelude.push(
         `if [ -f "${opts.cwdFile}" ]; then cd "$(cat "${opts.cwdFile}")" 2>/dev/null || true; fi`,
-      );
+      )
     }
     if (opts.funcFile) {
       prelude.push(
         `if [ -f "${opts.funcFile}" ]; then . "${opts.funcFile}"; fi`,
-      );
+      )
     }
     // Don't use exec - the command might be a bash function from funcFile.
     // exec only works with executables, not shell functions.
-    prelude.push(cmd);
-    const wrapperScript = prelude.join("\n");
+    prelude.push(cmd)
+    const wrapperScript = prelude.join("\n")
 
     this.proc = Bun.spawn(["bash", "-c", wrapperScript], {
       stdin: "pipe",
@@ -103,58 +103,58 @@ export class CmdSession {
         // Enable OSC 133 shell integration in subprocess
         ...(this.useOsc133 ? { TERM_SHELL_INTEGRATION: "1" } : {}),
       },
-    });
+    })
 
     // Start background readers for both streams
-    this.startReaders();
+    this.startReaders()
   }
 
   private startReaders(): void {
     // Background reader for stdout using Bun's ReadableStream
     this.stdoutReader = (async () => {
-      const stream = this.proc.stdout;
-      const reader = stream.getReader();
+      const stream = this.proc.stdout
+      const reader = stream.getReader()
       try {
         while (!this.closed) {
-          const { value, done } = await reader.read();
-          if (done) break;
+          const { value, done } = await reader.read()
+          if (done) break
           if (value) {
-            this.stdoutBuffer += new TextDecoder().decode(value);
+            this.stdoutBuffer += new TextDecoder().decode(value)
           }
         }
       } catch {
         // Stream closed or error - ignore during cleanup
       } finally {
         try {
-          reader.releaseLock();
+          reader.releaseLock()
         } catch {
           // Ignore
         }
       }
-    })();
+    })()
 
     // Background reader for stderr using Bun's ReadableStream
     this.stderrReader = (async () => {
-      const stream = this.proc.stderr;
-      const reader = stream.getReader();
+      const stream = this.proc.stderr
+      const reader = stream.getReader()
       try {
         while (!this.closed) {
-          const { value, done } = await reader.read();
-          if (done) break;
+          const { value, done } = await reader.read()
+          if (done) break
           if (value) {
-            this.stderrBuffer += new TextDecoder().decode(value);
+            this.stderrBuffer += new TextDecoder().decode(value)
           }
         }
       } catch {
         // Stream closed or error - ignore during cleanup
       } finally {
         try {
-          reader.releaseLock();
+          reader.releaseLock()
         } catch {
           // Ignore
         }
       }
-    })();
+    })()
   }
 
   /**
@@ -163,23 +163,23 @@ export class CmdSession {
    * Falls back to startupDelay timeout if no marker is received.
    */
   private async waitForReady(): Promise<void> {
-    const startTime = Date.now();
+    const startTime = Date.now()
     // Use a longer timeout for startup (5 seconds) to handle high-concurrency scenarios
-    const maxStartupWait = Math.max(this.maxWait, 5000);
+    const maxStartupWait = Math.max(this.maxWait, 5000)
 
     while (true) {
       // Check for OSC 133;A (prompt start marker)
       if (OSC_133_A_PATTERN.test(this.stdoutBuffer)) {
-        return;
+        return
       }
 
-      const elapsed = Date.now() - startTime;
+      const elapsed = Date.now() - startTime
       if (elapsed >= maxStartupWait) {
         // Timeout - proceed anyway, execute() will handle any issues
-        return;
+        return
       }
 
-      await Bun.sleep(10);
+      await Bun.sleep(10)
     }
   }
 
@@ -191,59 +191,59 @@ export class CmdSession {
    */
   async execute(command: string): Promise<ShellResult> {
     // Wait for subprocess to be ready on first execute
-    const isFirstExecute = this.firstExecute;
+    const isFirstExecute = this.firstExecute
     if (isFirstExecute) {
       if (this.useOsc133) {
         // For OSC 133 mode, wait for initial prompt marker (more robust than fixed delay)
-        await this.waitForReady();
+        await this.waitForReady()
       } else if (this.startupDelay > 0) {
         // For non-OSC 133 mode, use fixed delay
-        await Bun.sleep(this.startupDelay);
+        await Bun.sleep(this.startupDelay)
       }
-      this.firstExecute = false;
+      this.firstExecute = false
     }
 
     // Clear buffers (but preserve initial prompt for first command in OSC 133 mode)
     // The initial prompt is expected to be part of the output for first command
     if (!isFirstExecute || !this.useOsc133) {
-      this.stdoutBuffer = "";
-      this.stderrBuffer = "";
+      this.stdoutBuffer = ""
+      this.stderrBuffer = ""
     }
 
     // Write command to stdin using Bun's FileSink
     // FileSink has write() method that accepts strings or Uint8Array
     // Note: write() and flush() return promises but we intentionally fire-and-forget
     // as the timeout-based read loop will handle waiting for output
-    void this.proc.stdin.write(command + "\n");
-    void this.proc.stdin.flush();
+    void this.proc.stdin.write(command + "\n")
+    void this.proc.stdin.flush()
 
     // Wait for output with timeout logic
-    const startTime = Date.now();
-    let lastOutputTime = Date.now();
-    let lastLen = 0;
-    let exitCode = 0;
+    const startTime = Date.now()
+    let lastOutputTime = Date.now()
+    let lastLen = 0
+    let exitCode = 0
 
     while (true) {
-      const elapsed = Date.now() - startTime;
-      const currentLen = this.stdoutBuffer.length + this.stderrBuffer.length;
+      const elapsed = Date.now() - startTime
+      const currentLen = this.stdoutBuffer.length + this.stderrBuffer.length
 
       // New output? Reset silence timer
       if (currentLen > lastLen) {
-        lastOutputTime = Date.now();
-        lastLen = currentLen;
+        lastOutputTime = Date.now()
+        lastLen = currentLen
       }
 
       // OSC 133 mode: check for completion marker
       // We need BOTH OSC 133;D (command done) AND OSC 133;A (next prompt ready)
       // to ensure we capture the full output including the next prompt
       if (this.useOsc133) {
-        const matchD = this.stdoutBuffer.match(OSC_133_D_PATTERN);
+        const matchD = this.stdoutBuffer.match(OSC_133_D_PATTERN)
         if (matchD) {
-          exitCode = matchD[1] ? parseInt(matchD[1], 10) : 0;
+          exitCode = matchD[1] ? parseInt(matchD[1], 10) : 0
           // Also wait for OSC 133;A (prompt ready) which comes after D
           // This ensures we capture the next prompt in the output
           if (OSC_133_A_PATTERN.test(this.stdoutBuffer.slice(matchD.index!))) {
-            break;
+            break
           }
         }
       }
@@ -251,58 +251,58 @@ export class CmdSession {
       // Silence timeout reached? (only if we have some output)
       // In OSC 133 mode, we rely on markers instead - only use silence for non-OSC 133
       if (!this.useOsc133) {
-        const silenceTime = Date.now() - lastOutputTime;
+        const silenceTime = Date.now() - lastOutputTime
         if (silenceTime >= this.minWait && currentLen > 0) {
-          break;
+          break
         }
       }
 
       // Max timeout reached?
       if (elapsed >= this.maxWait) {
-        break;
+        break
       }
 
       // Small sleep to avoid busy-waiting
-      await Bun.sleep(10);
+      await Bun.sleep(10)
     }
 
     // Strip OSC 133 sequences from output (always strip when useOsc133 is enabled)
-    let stdout = this.stdoutBuffer;
-    let stderr = this.stderrBuffer;
+    let stdout = this.stdoutBuffer
+    let stderr = this.stderrBuffer
     if (this.useOsc133) {
-      stdout = stdout.replace(OSC_133_ANY_PATTERN, "");
-      stderr = stderr.replace(OSC_133_ANY_PATTERN, "");
+      stdout = stdout.replace(OSC_133_ANY_PATTERN, "")
+      stderr = stderr.replace(OSC_133_ANY_PATTERN, "")
     }
 
     return {
       stdout: Buffer.from(stdout),
       stderr: Buffer.from(stderr),
       exitCode,
-    };
+    }
   }
 
   /**
    * Close the subprocess
    */
   async close(): Promise<void> {
-    if (this.closed) return;
-    this.closed = true;
+    if (this.closed) return
+    this.closed = true
 
     try {
       // Close stdin to signal EOF (returns a number, not a promise)
-      void this.proc.stdin.end();
+      void this.proc.stdin.end()
 
       // Wait for process to exit with timeout
-      const exitPromise = this.proc.exited;
+      const exitPromise = this.proc.exited
       const timeoutPromise = new Promise<"timeout">((resolve) => {
-        setTimeout(() => resolve("timeout"), 1000);
-      });
+        setTimeout(() => resolve("timeout"), 1000)
+      })
 
-      const result = await Promise.race([exitPromise, timeoutPromise]);
+      const result = await Promise.race([exitPromise, timeoutPromise])
       if (result === "timeout") {
         // Force kill if it doesn't exit gracefully
-        this.proc.kill();
-        await this.proc.exited;
+        this.proc.kill()
+        await this.proc.exited
       }
     } catch {
       // Ignore errors during cleanup
@@ -313,10 +313,10 @@ export class CmdSession {
    * Check if the subprocess is still running
    */
   get isRunning(): boolean {
-    return !this.closed && this.proc.exitCode === null;
+    return !this.closed && this.proc.exitCode === null
   }
 
   async [Symbol.asyncDispose](): Promise<void> {
-    await this.close();
+    await this.close()
   }
 }
