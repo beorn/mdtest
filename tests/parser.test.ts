@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect } from "vitest";
 import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,7 +13,7 @@ import {
 } from "../src/core";
 import { parseMarkdown } from "../src/markdown";
 
-const MDTEST = join(import.meta.dir, "../src/index.ts");
+const MDTEST = join(import.meta.dirname, "../src/index.ts");
 
 // ============ Helpers ============
 

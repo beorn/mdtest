@@ -1,5 +1,5 @@
 // Integration tests: Verify bun test integration behavior
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { describe, test, expect, beforeAll, afterAll } from "vitest";
 import { writeFileSync, unlinkSync, mkdtempSync } from "fs";
 import { join, dirname } from "path";
 import { tmpdir } from "os";
