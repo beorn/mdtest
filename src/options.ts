@@ -56,7 +56,7 @@ export function parseHeadingOptions(
   headingText: string,
 ): Record<string, unknown> {
   const match = headingText.match(/\{([^}]+)\}$/)
-  if (!match || !match[1]) return {}
+  if (!match?.[1]) return {}
 
   const optString = match[1].trim()
   const parsed = parseInfo(optString)

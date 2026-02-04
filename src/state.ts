@@ -34,8 +34,9 @@ export function createStatePaths(fileId: string, baseDir: string): StateFiles {
  */
 export function ensureStateFiles(paths: StateFiles, initialCwd: string): void {
   if (!existsSync(paths.envFile)) writeFileSync(paths.envFile, "", "utf8")
-  if (!existsSync(paths.cwdFile))
+  if (!existsSync(paths.cwdFile)) {
     writeFileSync(paths.cwdFile, initialCwd, "utf8")
+  }
   if (!existsSync(paths.funcFile)) writeFileSync(paths.funcFile, "", "utf8")
 }
 

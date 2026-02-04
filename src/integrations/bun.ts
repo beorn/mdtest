@@ -241,13 +241,14 @@ function registerBunTests(
       if (!pathGroups.has(key)) pathGroups.set(key, [])
 
       const group = pathGroups.get(key)
-      if (group)
+      if (group) {
         group.push({
           steps: heading.steps,
           index: heading.index,
           block: heading.block,
           heading: heading.heading,
         })
+      }
     }
 
     // Register nested describe blocks for each unique path
