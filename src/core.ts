@@ -155,10 +155,7 @@ function escapeRegex(s: string): string {
 
 // ============ Pattern Matching ============
 
-export function compileExpectedLineToRegex(
-  line: string,
-  caps: Record<string, string>,
-): { re: RegExp; keys: string[] } {
+export function compileExpectedLineToRegex(line: string, caps: Record<string, string>): { re: RegExp; keys: string[] } {
   // Full-line regex
   if (line.length >= 2 && line.startsWith("/") && line.endsWith("/")) {
     return { re: new RegExp(`^${line.slice(1, -1)}$`), keys: [] }
@@ -286,12 +283,7 @@ export function hasPatterns(text: string): boolean {
   return false
 }
 
-export function hintMismatch(
-  kind: "stdout" | "stderr",
-  exp: string[],
-  act: string[],
-  _detail?: string,
-) {
+export function hintMismatch(kind: "stdout" | "stderr", exp: string[], act: string[], _detail?: string) {
   const header = `Mismatch in ${kind}`
   const show = (arr: string[]) => {
     if (!arr.length) return "⟂(empty)"
@@ -305,11 +297,5 @@ export function hintMismatch(
     }
     return text
   }
-  return [
-    header,
-    "---- expected ----",
-    show(exp),
-    "---- actual ------",
-    show(act),
-  ].join("\n")
+  return [header, "---- expected ----", show(exp), "---- actual ------", show(act)].join("\n")
 }

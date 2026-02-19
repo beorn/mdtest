@@ -62,9 +62,7 @@ export function buildScript(
   // Load previous state
   pre.push("set +e") // runner checks exit codes itself
   pre.push(`if [ -f "${envFile}" ]; then set -a; . "${envFile}"; set +a; fi`)
-  pre.push(
-    `if [ -f "${cwdFile}" ]; then cd "$(cat "${cwdFile}")" 2>/dev/null || true; fi`,
-  )
+  pre.push(`if [ -f "${cwdFile}" ]; then cd "$(cat "${cwdFile}")" 2>/dev/null || true; fi`)
   pre.push(`if [ -f "${funcFile}" ]; then . "${funcFile}"; fi`)
 
   // Apply block options
@@ -90,12 +88,7 @@ export function buildScript(
 /**
  * Build a script to call a hook if it exists
  */
-export function buildHookScript(
-  hookName: string,
-  envFile: string,
-  cwdFile: string,
-  funcFile: string,
-): string {
+export function buildHookScript(hookName: string, envFile: string, cwdFile: string, funcFile: string): string {
   return `
     set +e
     [ -f "${envFile}" ] && { set -a; . "${envFile}"; set +a; }

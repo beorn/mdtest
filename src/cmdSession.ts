@@ -71,19 +71,13 @@ export class CmdSession {
     // Build wrapper script that loads session state before running the cmd
     const prelude: string[] = ["set +e"]
     if (opts.envFile) {
-      prelude.push(
-        `if [ -f "${opts.envFile}" ]; then set -a; . "${opts.envFile}"; set +a; fi`,
-      )
+      prelude.push(`if [ -f "${opts.envFile}" ]; then set -a; . "${opts.envFile}"; set +a; fi`)
     }
     if (opts.cwdFile) {
-      prelude.push(
-        `if [ -f "${opts.cwdFile}" ]; then cd "$(cat "${opts.cwdFile}")" 2>/dev/null || true; fi`,
-      )
+      prelude.push(`if [ -f "${opts.cwdFile}" ]; then cd "$(cat "${opts.cwdFile}")" 2>/dev/null || true; fi`)
     }
     if (opts.funcFile) {
-      prelude.push(
-        `if [ -f "${opts.funcFile}" ]; then . "${opts.funcFile}"; fi`,
-      )
+      prelude.push(`if [ -f "${opts.funcFile}" ]; then . "${opts.funcFile}"; fi`)
     }
     // Don't use exec - the command might be a bash function from funcFile.
     // exec only works with executables, not shell functions.

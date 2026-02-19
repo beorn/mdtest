@@ -44,10 +44,7 @@ goodbye
         stdout: "pipe",
         stderr: "pipe",
       })
-      const [stdout, stderr] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-      ])
+      const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()])
       const result = stdout + stderr
 
       // Should show expected/actual diff
@@ -115,10 +112,7 @@ test B
 
     test("verify describe block nesting matches heading hierarchy", async () => {
       // Run mdtest on the test file and check output shows proper heading hierarchy
-      const result = await $`bun ${mdtestCli} ${tempFile}`
-        .nothrow()
-        .quiet()
-        .text()
+      const result = await $`bun ${mdtestCli} ${tempFile}`.nothrow().quiet().text()
 
       // Should show proper heading structure in output
       expect(result).toContain("Setup")

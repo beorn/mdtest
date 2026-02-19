@@ -25,10 +25,7 @@ const BUILTIN_PLUGINS: Record<string, PluginFactory> = {
  * @param testFilePath - Absolute path to the .test.md file (for relative resolution)
  * @returns Plugin factory function
  */
-export async function loadPlugin(
-  specifier: string,
-  testFilePath: string,
-): Promise<PluginFactory> {
+export async function loadPlugin(specifier: string, testFilePath: string): Promise<PluginFactory> {
   // Built-in plugin?
   if (specifier in BUILTIN_PLUGINS) {
     const plugin = BUILTIN_PLUGINS[specifier]
@@ -39,18 +36,14 @@ export async function loadPlugin(
   }
 
   // Relative or absolute path - resolve from test file location
-  const resolved = specifier.startsWith(".")
-    ? resolve(dirname(testFilePath), specifier)
-    : specifier // Bare specifier or absolute path
+  const resolved = specifier.startsWith(".") ? resolve(dirname(testFilePath), specifier) : specifier // Bare specifier or absolute path
 
   // Dynamic import (Bun handles .ts files natively)
   const module = await import(resolved)
 
   // Export should be default export
   if (!module.default) {
-    throw new Error(
-      `Plugin module ${specifier} must have a default export (got: ${Object.keys(module).join(", ")})`,
-    )
+    throw new Error(`Plugin module ${specifier} must have a default export (got: ${Object.keys(module).join(", ")})`)
   }
 
   return module.default

@@ -52,9 +52,7 @@ export function parseFrontmatter(markdown: string): Record<string, unknown> {
  * Parse heading options
  * Format: ## Title {key1=value1 key2 key3=value3}
  */
-export function parseHeadingOptions(
-  headingText: string,
-): Record<string, unknown> {
+export function parseHeadingOptions(headingText: string): Record<string, unknown> {
   const match = headingText.match(/\{([^}]+)\}$/)
   if (!match?.[1]) return {}
 
@@ -73,9 +71,7 @@ export function parseHeadingOptions(
  * Merge options from multiple levels
  * Later levels override earlier levels
  */
-export function mergeOptions(
-  ...optionSets: Array<Record<string, unknown>>
-): Record<string, unknown> {
+export function mergeOptions(...optionSets: Array<Record<string, unknown>>): Record<string, unknown> {
   const merged: Record<string, unknown> = {}
 
   for (const opts of optionSets) {

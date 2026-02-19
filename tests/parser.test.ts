@@ -3,14 +3,7 @@ import { readFileSync, writeFileSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { $ } from "bun"
-import {
-  parseInfo,
-  parseBlock,
-  splitNorm,
-  matchLines,
-  hasPatterns,
-  compileExpectedLineToRegex,
-} from "../src/core"
+import { parseInfo, parseBlock, splitNorm, matchLines, hasPatterns, compileExpectedLineToRegex } from "../src/core"
 import { parseMarkdown } from "../src/markdown"
 
 const MDTEST = join(import.meta.dirname, "../src/index.ts")
@@ -39,9 +32,7 @@ describe("parsing", () => {
     test("console", () => {
       const md = "# Test\n```console\n$ echo hi\nhi\n```\n"
       const { codeBlocks } = parseMarkdown(md)
-      const fences = codeBlocks.filter(
-        (b) => b.lang === "console" || b.lang === "sh",
-      )
+      const fences = codeBlocks.filter((b) => b.lang === "console" || b.lang === "sh")
       expect(fences).toHaveLength(1)
       expect(fences[0]!.lang).toBe("console")
       expect(fences[0]!.value).toBe("$ echo hi\nhi")
@@ -50,36 +41,28 @@ describe("parsing", () => {
     test("sh", () => {
       const md = "```sh\n$ pwd\n/tmp\n```"
       const { codeBlocks } = parseMarkdown(md)
-      const fences = codeBlocks.filter(
-        (b) => b.lang === "console" || b.lang === "sh",
-      )
+      const fences = codeBlocks.filter((b) => b.lang === "console" || b.lang === "sh")
       expect(fences[0]!.lang).toBe("sh")
     })
 
     test("multiple", () => {
       const md = "```console\n$ echo 1\n```\ntext\n```console\n$ echo 2\n```"
       const { codeBlocks } = parseMarkdown(md)
-      const fences = codeBlocks.filter(
-        (b) => b.lang === "console" || b.lang === "sh",
-      )
+      const fences = codeBlocks.filter((b) => b.lang === "console" || b.lang === "sh")
       expect(fences).toHaveLength(2)
     })
 
     test("with info", () => {
       const md = "```console exit=1 cwd=/tmp\n$ false\n```"
       const { codeBlocks } = parseMarkdown(md)
-      const fences = codeBlocks.filter(
-        (b) => b.lang === "console" || b.lang === "sh",
-      )
+      const fences = codeBlocks.filter((b) => b.lang === "console" || b.lang === "sh")
       expect(fences[0]!.meta).toBe("exit=1 cwd=/tmp")
     })
 
     test("ignores non-shell", () => {
       const md = "```javascript\nconst x = 1\n```\n```console\n$ echo\n```"
       const { codeBlocks } = parseMarkdown(md)
-      const fences = codeBlocks.filter(
-        (b) => b.lang === "console" || b.lang === "sh",
-      )
+      const fences = codeBlocks.filter((b) => b.lang === "console" || b.lang === "sh")
       expect(fences).toHaveLength(1)
       expect(fences[0]!.lang).toBe("console")
     })
@@ -138,9 +121,7 @@ describe("parsing", () => {
     })
 
     test("stdout", () => {
-      const { expect: exp } = parseBlock(
-        "$ cmd\noutput line 1\noutput line 2\n",
-      )
+      const { expect: exp } = parseBlock("$ cmd\noutput line 1\noutput line 2\n")
       expect(exp.stdout).toEqual(["output line 1", "output line 2"])
     })
 
@@ -204,20 +185,12 @@ describe("matching", () => {
     })
 
     test("ellipsis", () => {
-      const result = matchLines(
-        ["start", "[...]", "end"],
-        ["start", "middle1", "middle2", "end"],
-        {},
-      )
+      const result = matchLines(["start", "[...]", "end"], ["start", "middle1", "middle2", "end"], {})
       expect(result.ok).toBe(true)
     })
 
     test("ellipsis at end", () => {
-      const result = matchLines(
-        ["start", "[...]"],
-        ["start", "any", "thing"],
-        {},
-      )
+      const result = matchLines(["start", "[...]"], ["start", "any", "thing"], {})
       expect(result.ok).toBe(true)
     })
 
@@ -246,21 +219,13 @@ describe("matching", () => {
 
     test("capture reuse", () => {
       const caps: Record<string, string> = { id: "ABC-123" }
-      const result = matchLines(
-        ["ID again: {{id}}"],
-        ["ID again: ABC-123"],
-        caps,
-      )
+      const result = matchLines(["ID again: {{id}}"], ["ID again: ABC-123"], caps)
       expect(result.ok).toBe(true)
     })
 
     test("capture mismatch", () => {
       const caps: Record<string, string> = { id: "ABC-123" }
-      const result = matchLines(
-        ["ID again: {{id}}"],
-        ["ID again: XYZ-789"],
-        caps,
-      )
+      const result = matchLines(["ID again: {{id}}"], ["ID again: XYZ-789"], caps)
       expect(result.ok).toBe(false)
       expect(result.msg).toContain("line mismatch")
     })
@@ -321,10 +286,7 @@ describe("matching", () => {
     })
 
     test("capture with regex", () => {
-      const { re, keys } = compileExpectedLineToRegex(
-        "UUID: {{uuid:/[0-9A-F-]{36}/}}",
-        {},
-      )
+      const { re, keys } = compileExpectedLineToRegex("UUID: {{uuid:/[0-9A-F-]{36}/}}", {})
       const match = "UUID: 123E4567-E89B-12D3-A456-426614174000".match(re)
       expect(match).not.toBeNull()
       expect(match?.groups?.uuid).toBe("123E4567-E89B-12D3-A456-426614174000")
@@ -368,9 +330,7 @@ describe("cli", () => {
 
   test.concurrent("persistent context", async () => {
     const file = createTestFile(
-      mkBlock("$ export FOO=bar\n$ export BAZ=qux") +
-        "\n\n" +
-        mkBlock('$ echo "$FOO-$BAZ"\nbar-qux'),
+      mkBlock("$ export FOO=bar\n$ export BAZ=qux") + "\n\n" + mkBlock('$ echo "$FOO-$BAZ"\nbar-qux'),
     )
     const result = await runMdtest(file)
     expect(result.exitCode).toBe(0)
@@ -406,17 +366,13 @@ describe("cli", () => {
   })
 
   test.concurrent("regex", async () => {
-    const file = createTestFile(
-      mkBlock('$ date +"%Y-%m-%d"\n/\\d{4}-\\d{2}-\\d{2}/'),
-    )
+    const file = createTestFile(mkBlock('$ date +"%Y-%m-%d"\n/\\d{4}-\\d{2}-\\d{2}/'))
     const result = await runMdtest(file)
     expect(result.exitCode).toBe(0)
   })
 
   test.concurrent("ellipsis", async () => {
-    const file = createTestFile(
-      mkBlock('$ echo -e "Line 1\\nLine 2\\nLine 3"\nLine 1\n[...]\nLine 3'),
-    )
+    const file = createTestFile(mkBlock('$ echo -e "Line 1\\nLine 2\\nLine 3"\nLine 1\n[...]\nLine 3'))
     const result = await runMdtest(file)
     expect(result.exitCode).toBe(0)
   })
@@ -430,13 +386,9 @@ describe("cli", () => {
       `# Test\n` +
         mkBlock(`$ beforeAll() {\n>   echo "0" > ${counterFile}\n> }`) +
         "\n\n" +
-        mkBlock(
-          `$ echo "$(( $(cat ${counterFile}) + 1 ))" > ${counterFile}\n$ cat ${counterFile}\n1`,
-        ) +
+        mkBlock(`$ echo "$(( $(cat ${counterFile}) + 1 ))" > ${counterFile}\n$ cat ${counterFile}\n1`) +
         "\n\n" +
-        mkBlock(
-          `$ echo "$(( $(cat ${counterFile}) + 1 ))" > ${counterFile}\n$ cat ${counterFile}\n2`,
-        ),
+        mkBlock(`$ echo "$(( $(cat ${counterFile}) + 1 ))" > ${counterFile}\n$ cat ${counterFile}\n2`),
     )
     const result = await runMdtest(file)
     expect(result.exitCode).toBe(0)
@@ -450,9 +402,7 @@ describe("cli", () => {
   })
 
   test.concurrent("stderr", async () => {
-    const file = createTestFile(
-      mkBlock('$ echo "error message" >&2\n! error message'),
-    )
+    const file = createTestFile(mkBlock('$ echo "error message" >&2\n! error message'))
     const result = await runMdtest(file)
     expect(result.exitCode).toBe(0)
   })

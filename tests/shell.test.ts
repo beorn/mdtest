@@ -86,13 +86,7 @@ describe("shell", () => {
     })
 
     test("includes commands in script", () => {
-      const script = buildScript(
-        ["echo hello", "echo world"],
-        {},
-        envFile,
-        cwdFile,
-        funcFile,
-      )
+      const script = buildScript(["echo hello", "echo world"], {}, envFile, cwdFile, funcFile)
 
       expect(script).toContain("echo hello")
       expect(script).toContain("echo world")
@@ -109,62 +103,32 @@ describe("shell", () => {
     })
 
     test("applies cwd option", () => {
-      const script = buildScript(
-        ["pwd"],
-        { cwd: "/tmp" },
-        envFile,
-        cwdFile,
-        funcFile,
-      )
+      const script = buildScript(["pwd"], { cwd: "/tmp" }, envFile, cwdFile, funcFile)
 
       expect(script).toContain("cd /tmp")
     })
 
     test("escapes cwd with special characters", () => {
-      const script = buildScript(
-        ["pwd"],
-        { cwd: "/path/with spaces" },
-        envFile,
-        cwdFile,
-        funcFile,
-      )
+      const script = buildScript(["pwd"], { cwd: "/path/with spaces" }, envFile, cwdFile, funcFile)
 
       expect(script).toContain("cd '/path/with spaces'")
     })
 
     test("applies env options", () => {
-      const script = buildScript(
-        ["echo $FOO"],
-        { env: { FOO: "bar", BAZ: "qux" } },
-        envFile,
-        cwdFile,
-        funcFile,
-      )
+      const script = buildScript(["echo $FOO"], { env: { FOO: "bar", BAZ: "qux" } }, envFile, cwdFile, funcFile)
 
       expect(script).toContain("export FOO=bar")
       expect(script).toContain("export BAZ=qux")
     })
 
     test("escapes env values with special characters", () => {
-      const script = buildScript(
-        ["echo $FOO"],
-        { env: { FOO: "hello world" } },
-        envFile,
-        cwdFile,
-        funcFile,
-      )
+      const script = buildScript(["echo $FOO"], { env: { FOO: "hello world" } }, envFile, cwdFile, funcFile)
 
       expect(script).toContain("export FOO='hello world'")
     })
 
     test("combines cwd and env options", () => {
-      const script = buildScript(
-        ["pwd && echo $FOO"],
-        { cwd: "/tmp", env: { FOO: "bar" } },
-        envFile,
-        cwdFile,
-        funcFile,
-      )
+      const script = buildScript(["pwd && echo $FOO"], { cwd: "/tmp", env: { FOO: "bar" } }, envFile, cwdFile, funcFile)
 
       expect(script).toContain("cd /tmp")
       expect(script).toContain("export FOO=bar")

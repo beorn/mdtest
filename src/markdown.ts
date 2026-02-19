@@ -70,15 +70,9 @@ export function parseMarkdown(md: string): MarkdownStructure {
   })
 
   // Sort by position for deterministic order
-  headings.sort(
-    (a, b) =>
-      a.position.line - b.position.line ||
-      a.position.column - b.position.column,
-  )
+  headings.sort((a, b) => a.position.line - b.position.line || a.position.column - b.position.column)
   codeBlocks.sort(
-    (a, b) =>
-      a.position.start.line - b.position.start.line ||
-      a.position.start.column - b.position.start.column,
+    (a, b) => a.position.start.line - b.position.start.line || a.position.start.column - b.position.start.column,
   )
 
   // Build parent links for hierarchical navigation
@@ -90,10 +84,7 @@ export function parseMarkdown(md: string): MarkdownStructure {
 /**
  * Find the nearest heading before a given position
  */
-export function findNearestHeading(
-  headings: Heading[],
-  pos: { line: number; column: number },
-): Heading | null {
+export function findNearestHeading(headings: Heading[], pos: { line: number; column: number }): Heading | null {
   let nearest: Heading | null = null
   for (const h of headings) {
     if (isBefore(h.position, pos)) nearest = h
@@ -129,10 +120,7 @@ export function generateTestId(
  * Compare two positions (line/column)
  * Returns true if position a comes before position b
  */
-function isBefore(
-  a: { line: number; column: number },
-  b: { line: number; column: number },
-): boolean {
+function isBefore(a: { line: number; column: number }, b: { line: number; column: number }): boolean {
   return a.line < b.line || (a.line === b.line && a.column <= b.column)
 }
 
@@ -158,10 +146,7 @@ function buildParentLinks(headings: Heading[]): void {
 
   for (const heading of headings) {
     // Pop stack until we find a higher-level heading (lower depth number)
-    while (
-      stack.length > 0 &&
-      stack[stack.length - 1]!.depth >= heading.depth
-    ) {
+    while (stack.length > 0 && stack[stack.length - 1]!.depth >= heading.depth) {
       stack.pop()
     }
 

@@ -65,9 +65,7 @@ describe.skipIf(isWindows)("PtySession", () => {
       })
       try {
         // Check if stdout is a TTY from the subprocess perspective
-        const result = await session.execute(
-          "[ -t 1 ] && echo TTY || echo PIPE",
-        )
+        const result = await session.execute("[ -t 1 ] && echo TTY || echo PIPE")
         // Get first non-empty line
         const firstLine = result.stdout
           .toString()

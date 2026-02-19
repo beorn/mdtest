@@ -5,24 +5,13 @@
 // import { registerMdTests } from '@beorn/mdtest/vitest'
 // await registerMdTests('tests/e2e/**/*.test.md')
 
-import {
-  test,
-  describe,
-  beforeAll,
-  afterAll,
-  beforeEach,
-  afterEach,
-} from "vitest"
+import { test, describe, beforeAll, afterAll, beforeEach, afterEach } from "vitest"
 import { glob } from "glob"
 import { basename, isAbsolute, resolve, join } from "node:path"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { parseBlock, matchLines, hintMismatch } from "../core.js"
-import {
-  parseMarkdown,
-  findNearestHeading,
-  generateTestId,
-} from "../markdown.js"
+import { parseMarkdown, findNearestHeading, generateTestId } from "../markdown.js"
 import type { Heading, CodeBlock } from "../markdown.js"
 import { readFile } from "fs/promises"
 import { PluginExecutor } from "../plugin-executor.js"
@@ -32,20 +21,14 @@ import type { ShellResult, ShellOptions } from "../shell.js"
 const MAX_TEST_NAME_LENGTH = 60
 
 // Discovery API
-export async function discoverMdTests(
-  pattern = "**/*.test.md",
-): Promise<string[]> {
+export async function discoverMdTests(pattern = "**/*.test.md"): Promise<string[]> {
   return glob(pattern)
 }
 
 // Register all .test.md files as Vitest tests
-export async function registerMdTests(
-  pattern: string | string[] = "**/*.test.md",
-): Promise<void> {
+export async function registerMdTests(pattern: string | string[] = "**/*.test.md"): Promise<void> {
   // Handle both string patterns and arrays of file paths
-  const files = Array.isArray(pattern)
-    ? pattern
-    : await discoverMdTests(pattern)
+  const files = Array.isArray(pattern) ? pattern : await discoverMdTests(pattern)
 
   for (const file of files) await registerMdTestFile(file)
 }
@@ -84,11 +67,7 @@ interface TestStructure {
   }>
 }
 
-function buildTestStructure(
-  codeBlocks: CodeBlock[],
-  headings: Heading[],
-  _filePath: string,
-): TestStructure {
+function buildTestStructure(codeBlocks: CodeBlock[], headings: Heading[], _filePath: string): TestStructure {
   const result: TestStructure = { headings: [] }
   const headingBlockCounts = new Map<string, number>()
 
@@ -127,10 +106,7 @@ function buildTestStructure(
   return result
 }
 
-function buildHeadingPath(
-  heading: Heading | null,
-  allHeadings: Heading[],
-): string[] {
+function buildHeadingPath(heading: Heading | null, allHeadings: Heading[]): string[] {
   if (!heading) return ["(no heading)"]
 
   // Count H1 headings (depth 1)
@@ -255,12 +231,8 @@ function registerVitestTests(
     // Sort by first occurrence in document to preserve execution order
     const sortedPaths = Array.from(pathGroups.entries()).sort((a, b) => {
       // Get first heading for each path from structure.headings
-      const aIndex = structure.headings.findIndex(
-        (h) => h.path.join("\x00") === a[0],
-      )
-      const bIndex = structure.headings.findIndex(
-        (h) => h.path.join("\x00") === b[0],
-      )
+      const aIndex = structure.headings.findIndex((h) => h.path.join("\x00") === a[0])
+      const bIndex = structure.headings.findIndex((h) => h.path.join("\x00") === b[0])
       return aIndex - bIndex
     })
 
@@ -356,14 +328,10 @@ function registerNestedTests(
           if (!outMatch.ok || !errMatch.ok || !exitOk) {
             const errors: string[] = []
             if (!outMatch.ok) {
-              errors.push(
-                hintMismatch("stdout", wantStdout, stdout, outMatch.msg),
-              )
+              errors.push(hintMismatch("stdout", wantStdout, stdout, outMatch.msg))
             }
             if (!errMatch.ok) {
-              errors.push(
-                hintMismatch("stderr", wantStderr, stderr, errMatch.msg),
-              )
+              errors.push(hintMismatch("stderr", wantStderr, stderr, errMatch.msg))
             }
             if (!exitOk) {
               errors.push(`exit code: expected ${wantExit}, got ${exitCode}`)
@@ -378,14 +346,7 @@ function registerNestedTests(
 
   // Create describe block and recurse to preserve execution order
   describe(path[depth]!, () => {
-    registerNestedTests(
-      path,
-      items,
-      executor,
-      capsStdout,
-      capsStderr,
-      depth + 1,
-    )
+    registerNestedTests(path, items, executor, capsStdout, capsStderr, depth + 1)
   })
 }
 
@@ -398,10 +359,7 @@ function registerNestedTests(
  * @param opts - Execution options (cwd, env, timeout)
  * @returns Promise<ShellResult> with stdout, stderr, exitCode
  */
-export async function vitestShell(
-  cmd: string[],
-  opts?: ShellOptions,
-): Promise<ShellResult> {
+export async function vitestShell(cmd: string[], opts?: ShellOptions): Promise<ShellResult> {
   const { spawn } = await import("node:child_process")
   const timeout = opts?.timeout ?? 30000 // Default 30s
 
@@ -457,9 +415,7 @@ export async function vitestShell(
         console.error(`[vitestShell]   stdout length: ${stdout.length}`)
         console.error(`[vitestShell]   stderr length: ${stderr.length}`)
         console.error(`[vitestShell]   exitCode: ${exitCode}`)
-        console.error(
-          `[vitestShell]   stdout preview: ${JSON.stringify(stdout.toString("utf8").slice(0, 100))}`,
-        )
+        console.error(`[vitestShell]   stdout preview: ${JSON.stringify(stdout.toString("utf8").slice(0, 100))}`)
       }
 
       resolve({

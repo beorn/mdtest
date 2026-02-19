@@ -82,18 +82,8 @@ import { join, dirname, isAbsolute } from "node:path"
 import { fileURLToPath } from "node:url"
 import { glob } from "glob"
 import { Command } from "@commander-js/extra-typings"
-import {
-  parseInfo,
-  parseBlock,
-  matchLines,
-  hasPatterns,
-  hintMismatch,
-} from "./core.js"
-import {
-  parseMarkdown,
-  findNearestHeading,
-  generateTestId,
-} from "./markdown.js"
+import { parseInfo, parseBlock, matchLines, hasPatterns, hintMismatch } from "./core.js"
+import { parseMarkdown, findNearestHeading, generateTestId } from "./markdown.js"
 import { PluginExecutor } from "./plugin-executor.js"
 import { stripAnsi } from "./utils.js"
 import { log, logFiles } from "./logger.js"
@@ -101,9 +91,7 @@ import { log, logFiles } from "./logger.js"
 // -------- Version Helper --------
 async function getVersion(): Promise<string> {
   const __dirname = dirname(fileURLToPath(import.meta.url))
-  const packageJson = JSON.parse(
-    await readFile(join(__dirname, "../package.json"), "utf-8"),
-  ) as {
+  const packageJson = JSON.parse(await readFile(join(__dirname, "../package.json"), "utf-8")) as {
     version: string
   }
   return packageJson.version
@@ -114,31 +102,12 @@ const program = new Command()
   .name("mdtest")
   .description("Markdown-based shell testing with persistent context")
   .version(await getVersion())
-  .argument(
-    "<patterns...>",
-    "Test file paths or glob patterns (e.g., tests/**/*.test.md)",
-  )
-  .option(
-    "-u, --update",
-    "Update snapshots (replace expected output with actual)",
-    false,
-  )
-  .option(
-    "--hide-body",
-    "Hide markdown body text in output (markdown reporter only)",
-    false,
-  )
-  .option(
-    "--trunc",
-    "Enable truncation of long lines in output (default: true)",
-    true,
-  )
+  .argument("<patterns...>", "Test file paths or glob patterns (e.g., tests/**/*.test.md)")
+  .option("-u, --update", "Update snapshots (replace expected output with actual)", false)
+  .option("--hide-body", "Hide markdown body text in output (markdown reporter only)", false)
+  .option("--trunc", "Enable truncation of long lines in output (default: true)", true)
   .option("--no-trunc", "Disable truncation of long lines in output")
-  .option(
-    "--dots",
-    "Dots reporter - show dots for passing tests, details only for failures",
-    false,
-  )
+  .option("--dots", "Dots reporter - show dots for passing tests, details only for failures", false)
   .option("--tap", "TAP reporter - output Test Anything Protocol format", false)
   .showHelpAfterError("(add --help for additional information)")
   .parse()
@@ -182,10 +151,7 @@ import { DEFAULTS } from "./constants.js"
 type Replacement = { start: number; end: number; newText: string }
 
 // Helper to convert character position to line/column
-function positionToLineColumn(
-  text: string,
-  offset: number,
-): { line: number; column: number } {
+function positionToLineColumn(text: string, offset: number): { line: number; column: number } {
   const lines = text.slice(0, offset).split("\n")
   return {
     line: lines.length,
@@ -213,11 +179,7 @@ async function testFile(
     log.debug?.("Reading test file: %s", testFilePath)
     const md = await readFile(testFilePath, "utf8")
     const { headings, codeBlocks } = parseMarkdown(md)
-    log.debug?.(
-      "Parsed %d headings, %d code blocks",
-      headings.length,
-      codeBlocks.length,
-    )
+    log.debug?.("Parsed %d headings, %d code blocks", headings.length, codeBlocks.length)
 
     // Extract ALL markdown content (for --show-body)
     // This includes: frontmatter, paragraphs between code blocks (but NOT headings)
@@ -245,10 +207,7 @@ async function testFile(
         while (bodyLines.length > 0 && bodyLines[0]!.trim() === "") {
           bodyLines.shift()
         }
-        while (
-          bodyLines.length > 0 &&
-          bodyLines[bodyLines.length - 1]!.trim() === ""
-        ) {
+        while (bodyLines.length > 0 && bodyLines[bodyLines.length - 1]!.trim() === "") {
           bodyLines.pop()
         }
 
@@ -330,12 +289,8 @@ async function testFile(
       if (seenTestIds.has(testId)) {
         console.error(`\n❌ ERROR: Duplicate test ID detected: "${testId}"`)
         console.error(`   Test IDs must be unique within a file.`)
-        console.error(
-          `   This usually happens when two code blocks are at the same heading level.`,
-        )
-        console.error(
-          `   Consider adding subheadings or unique identifiers to distinguish tests.\n`,
-        )
+        console.error(`   This usually happens when two code blocks are at the same heading level.`)
+        console.error(`   Consider adding subheadings or unique identifiers to distinguish tests.\n`)
         process.exit(1)
       }
       seenTestIds.add(testId)
@@ -355,10 +310,7 @@ async function testFile(
       await executor.beforeEach()
 
       // Execute block using plugin
-      const blockResult = await executor.executeBlock(
-        { lang: f.lang, info: f.info, text: f.text },
-        nearestHeading,
-      )
+      const blockResult = await executor.executeBlock({ lang: f.lang, info: f.info, text: f.text }, nearestHeading)
 
       // Plugin didn't handle this block - skip it
       if (!blockResult) {
@@ -420,9 +372,7 @@ async function testFile(
           }
 
           // Output each command with its output (indented for markdown)
-          const nonHookResults = results.filter(
-            (r) => !r.command.startsWith(">"),
-          )
+          const nonHookResults = results.filter((r) => !r.command.startsWith(">"))
           for (let i = 0; i < nonHookResults.length; i++) {
             const { command, stdout: cmdStdout } = nonHookResults[i]!
             // Format multi-line commands with ┊ continuation
@@ -435,16 +385,11 @@ async function testFile(
                 console.log(`    ┊ ${maybeTrunc(cmdLines[j]!)}`)
               }
             }
-            cmdStdout.forEach((line: string) =>
-              console.log(`      ${maybeTrunc(line)}`),
-            )
+            cmdStdout.forEach((line: string) => console.log(`      ${maybeTrunc(line)}`))
             // Add blank line between commands only if current command has output or not last
             const hasOutput = cmdStdout.length > 0
             const isLast = i === nonHookResults.length - 1
-            if (
-              !isLast &&
-              (hasOutput || nonHookResults[i + 1]!.stdout.length > 0)
-            ) {
+            if (!isLast && (hasOutput || nonHookResults[i + 1]!.stdout.length > 0)) {
               console.log("")
             }
           }
@@ -462,9 +407,7 @@ async function testFile(
           } else if (!errMatch.ok) {
             console.log(`  message: stderr mismatch`)
           } else if (!exitOk) {
-            console.log(
-              `  message: exit code ${exitCode}, expected ${wantExit}`,
-            )
+            console.log(`  message: exit code ${exitCode}, expected ${wantExit}`)
           }
           console.log("  ...")
         } else if (DOTS) {
@@ -488,9 +431,7 @@ async function testFile(
 
         // Output each command with failure indicator (indented for markdown) - skip in TAP mode
         if (!TAP) {
-          const nonHookResults = results.filter(
-            (r) => !r.command.startsWith(">"),
-          )
+          const nonHookResults = results.filter((r) => !r.command.startsWith(">"))
           for (const { command } of nonHookResults) {
             // Format multi-line commands with ┊ continuation
             const cmdLines = command.split("\n")
@@ -506,14 +447,10 @@ async function testFile(
           console.error("") // Blank line before error details
 
           if (!outMatch.ok) {
-            console.error(
-              hintMismatch("stdout", wantStdout, stdout, outMatch.msg),
-            )
+            console.error(hintMismatch("stdout", wantStdout, stdout, outMatch.msg))
           }
           if (!errMatch.ok) {
-            console.error(
-              hintMismatch("stderr", wantStderr, stderr, errMatch.msg),
-            )
+            console.error(hintMismatch("stderr", wantStderr, stderr, errMatch.msg))
           }
           if (!exitOk) {
             console.error(`exit code: expected ${wantExit}, got ${exitCode}`)
@@ -529,12 +466,8 @@ async function testFile(
       if (!(outMatch.ok && errMatch.ok && exitOk) && UPDATE) {
         // Warn if block has wildcards/regex/ellipsis patterns (but still update)
         if (hasPatterns(f.text)) {
-          console.error(
-            `⚠️  ${testName} contains patterns - updating anyway (patterns will be replaced)`,
-          )
-          console.error(
-            `   Patterns found: wildcards {{...}}, regex /.../, or ellipsis ...`,
-          )
+          console.error(`⚠️  ${testName} contains patterns - updating anyway (patterns will be replaced)`)
+          console.error(`   Patterns found: wildcards {{...}}, regex /.../, or ellipsis ...`)
           console.error(`   Review changes carefully before committing`)
         }
 
@@ -555,13 +488,7 @@ async function testFile(
         // exit code
         if (exitCode !== 0) rebuilt.push(`[${exitCode}]`)
 
-        const newFence =
-          "```" +
-          f.lang +
-          (f.info ? " " + f.info : "") +
-          "\n" +
-          rebuilt.join("\n") +
-          "\n```"
+        const newFence = "```" + f.lang + (f.info ? " " + f.info : "") + "\n" + rebuilt.join("\n") + "\n```"
         replacements.push({ start: f.start, end: f.end, newText: newFence })
       }
     }
@@ -598,11 +525,7 @@ async function main() {
   let isFirstFile = true
 
   for (const f of files) {
-    const {
-      fails: ff,
-      total: tt,
-      replacements: reps,
-    } = await testFile(f, isFirstFile)
+    const { fails: ff, total: tt, replacements: reps } = await testFile(f, isFirstFile)
     fails += ff
     total += tt
     if (UPDATE && reps.length) toUpdate.push({ path: f, reps })

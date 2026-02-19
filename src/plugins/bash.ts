@@ -8,14 +8,7 @@ import { splitNorm } from "../core.js"
 import { buildScript, buildHookScript } from "../shell.js"
 import { bunShell } from "../integrations/bun.js"
 import { DEFAULTS } from "../constants.js"
-import type {
-  Plugin,
-  PluginFactory,
-  FileOpts,
-  BlockOpts,
-  ExecFn,
-  ReplResult,
-} from "../types.js"
+import type { Plugin, PluginFactory, FileOpts, BlockOpts, ExecFn, ReplResult } from "../types.js"
 
 /**
  * Bash plugin - default mdtest execution mode

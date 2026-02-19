@@ -3,11 +3,7 @@
 
 import type { Plugin, FileOpts, BlockOpts, ReplResult } from "./types.js"
 import { loadPlugin } from "./loader.js"
-import {
-  parseFrontmatter,
-  mergeOptions,
-  parseHeadingOptions,
-} from "./options.js"
+import { parseFrontmatter, mergeOptions, parseHeadingOptions } from "./options.js"
 import { parseInfo } from "./core.js"
 import type { Heading, CodeBlock } from "./markdown.js"
 
@@ -65,9 +61,7 @@ export class PluginExecutor {
     exitCode: number
   } | null> {
     if (!this.plugin) {
-      throw new Error(
-        "PluginExecutor not initialized - call initialize() first",
-      )
+      throw new Error("PluginExecutor not initialized - call initialize() first")
     }
 
     // Parse block fence options
@@ -116,12 +110,8 @@ export class PluginExecutor {
       }
       results.push({
         command: cmd,
-        stdout: result.stdout
-          ? result.stdout.split("\n").filter((l) => l !== "")
-          : [],
-        stderr: result.stderr
-          ? result.stderr.split("\n").filter((l) => l !== "")
-          : [],
+        stdout: result.stdout ? result.stdout.split("\n").filter((l) => l !== "") : [],
+        stderr: result.stderr ? result.stderr.split("\n").filter((l) => l !== "") : [],
       })
       lastExitCode = result.exitCode
     }

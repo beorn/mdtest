@@ -1,13 +1,6 @@
 // Session management for shared state across commands in a test file
 
-import {
-  writeFileSync,
-  existsSync,
-  mkdirSync,
-  unlinkSync,
-  mkdtempSync,
-  rmSync,
-} from "fs"
+import { writeFileSync, existsSync, mkdirSync, unlinkSync, mkdtempSync, rmSync } from "fs"
 import { join } from "node:path"
 import { tmpdir } from "os"
 import { splitNorm, matchLines, hintMismatch } from "./core.js"
@@ -114,12 +107,7 @@ export class TestSession {
       const stdoutMatch = matchLines(expected.stdout || [], stdout, caps)
       if (!stdoutMatch.ok) {
         passed = false
-        diff = hintMismatch(
-          "stdout",
-          expected.stdout || [],
-          stdout,
-          stdoutMatch.msg,
-        )
+        diff = hintMismatch("stdout", expected.stdout || [], stdout, stdoutMatch.msg)
       }
 
       // Check stderr
@@ -127,12 +115,7 @@ export class TestSession {
         const stderrMatch = matchLines(expected.stderr, stderr, caps)
         if (!stderrMatch.ok) {
           passed = false
-          diff = hintMismatch(
-            "stderr",
-            expected.stderr,
-            stderr,
-            stderrMatch.msg,
-          )
+          diff = hintMismatch("stderr", expected.stderr, stderr, stderrMatch.msg)
         }
       }
 
@@ -165,9 +148,7 @@ export class TestSession {
     }
   }
 
-  async callHook(
-    hookName: "beforeAll" | "afterAll" | "beforeEach" | "afterEach",
-  ): Promise<void> {
+  async callHook(hookName: "beforeAll" | "afterAll" | "beforeEach" | "afterEach"): Promise<void> {
     const hookFile = this.hookFiles.get(hookName)
     if (!hookFile) return // Hook not defined
 
@@ -175,21 +156,13 @@ export class TestSession {
 
     // 1. Source all helper files (functions available)
     for (const filepath of this.helperFiles.values()) {
-      parts.push(
-        `[ -f "${filepath}" ] && source "${filepath}" 2>/dev/null || true`,
-      )
+      parts.push(`[ -f "${filepath}" ] && source "${filepath}" 2>/dev/null || true`)
     }
 
     // 2. Restore state from previous commands
-    parts.push(
-      `[ -f "${this.envFile}" ] && { set -a; . "${this.envFile}"; set +a; }`,
-    )
-    parts.push(
-      `[ -f "${this.cwdFile}" ] && cd "$(cat "${this.cwdFile}")" 2>/dev/null || true`,
-    )
-    parts.push(
-      `[ -f "${this.funcFile}" ] && source "${this.funcFile}" 2>/dev/null || true`,
-    )
+    parts.push(`[ -f "${this.envFile}" ] && { set -a; . "${this.envFile}"; set +a; }`)
+    parts.push(`[ -f "${this.cwdFile}" ] && cd "$(cat "${this.cwdFile}")" 2>/dev/null || true`)
+    parts.push(`[ -f "${this.funcFile}" ] && source "${this.funcFile}" 2>/dev/null || true`)
 
     // 3. Run the hook
     parts.push(`source "${hookFile}"`)
@@ -218,28 +191,18 @@ export class TestSession {
 
     // 1. Source all helper files (functions available)
     for (const filepath of this.helperFiles.values()) {
-      parts.push(
-        `[ -f "${filepath}" ] && source "${filepath}" 2>/dev/null || true`,
-      )
+      parts.push(`[ -f "${filepath}" ] && source "${filepath}" 2>/dev/null || true`)
     }
 
     // 2. Restore state from previous command
-    parts.push(
-      `[ -f "${this.envFile}" ] && { set -a; . "${this.envFile}"; set +a; }`,
-    )
-    parts.push(
-      `[ -f "${this.cwdFile}" ] && cd "$(cat "${this.cwdFile}")" 2>/dev/null || true`,
-    )
-    parts.push(
-      `[ -f "${this.funcFile}" ] && source "${this.funcFile}" 2>/dev/null || true`,
-    )
+    parts.push(`[ -f "${this.envFile}" ] && { set -a; . "${this.envFile}"; set +a; }`)
+    parts.push(`[ -f "${this.cwdFile}" ] && cd "$(cat "${this.cwdFile}")" 2>/dev/null || true`)
+    parts.push(`[ -f "${this.funcFile}" ] && source "${this.funcFile}" 2>/dev/null || true`)
 
     // 3. Run beforeEach hook (AFTER state restoration - acts as reset)
     const beforeEach = this.hookFiles.get("beforeEach")
     if (beforeEach) {
-      parts.push(
-        `[ -f "${beforeEach}" ] && source "${beforeEach}" 2>/dev/null || true`,
-      )
+      parts.push(`[ -f "${beforeEach}" ] && source "${beforeEach}" 2>/dev/null || true`)
     }
 
     // 4. User command
@@ -248,9 +211,7 @@ export class TestSession {
     // 5. Run afterEach hook
     const afterEach = this.hookFiles.get("afterEach")
     if (afterEach) {
-      parts.push(
-        `[ -f "${afterEach}" ] && source "${afterEach}" 2>/dev/null || true`,
-      )
+      parts.push(`[ -f "${afterEach}" ] && source "${afterEach}" 2>/dev/null || true`)
     }
 
     // 6. Save state for next command

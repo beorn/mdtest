@@ -62,9 +62,7 @@ export async function runBlock(
     // Use CmdSession on Windows or when pty=false is explicitly set.
     const isPosix = process.platform !== "win32"
     const usePty = opts.pty ?? isPosix // default to PTY on POSIX
-    const session = usePty
-      ? new PtySession(opts.cmd, sessionOpts)
-      : new CmdSession(opts.cmd, sessionOpts)
+    const session = usePty ? new PtySession(opts.cmd, sessionOpts) : new CmdSession(opts.cmd, sessionOpts)
 
     try {
       for (const cmd of commands) {
