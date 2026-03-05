@@ -1,6 +1,6 @@
 {
   "name": "@beorn/mdtest",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Bun-native Cram-style markdown testing with persistent context & snapshot updates",
   "keywords": [
     "bun",
