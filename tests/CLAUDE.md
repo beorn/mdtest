@@ -41,10 +41,10 @@ Self-testing: `mdtest-e2e.test.ts` registers `*.test.md` files in the test direc
 ## Ad-Hoc Testing
 
 ```bash
-bun vitest run vendor/beorn-mdtest/tests/              # All mdtest tests (fast only)
-bun vitest run vendor/beorn-mdtest/tests/parser.test.ts    # Parser tests
-bun vitest run vendor/beorn-mdtest/tests/shell.test.ts     # Shell escaping
-bun vitest run vendor/beorn-mdtest/tests/headings.test.ts  # Heading parsing
+bun vitest run vendor/mdtest/tests/              # All mdtest tests (fast only)
+bun vitest run vendor/mdtest/tests/parser.test.ts    # Parser tests
+bun vitest run vendor/mdtest/tests/shell.test.ts     # Shell escaping
+bun vitest run vendor/mdtest/tests/headings.test.ts  # Heading parsing
 ```
 
 ## Efficiency
