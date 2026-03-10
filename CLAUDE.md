@@ -25,23 +25,23 @@ CLI (src/index.ts)
 
 ## Key Files
 
-| File                       | Purpose                                         |
-| -------------------------- | ----------------------------------------------- |
-| `src/index.ts`             | CLI entry point                                 |
-| `src/markdown.ts`          | Markdown parsing, fence extraction              |
-| `src/executor.ts`          | Command execution, output matching              |
-| `src/session.ts`           | Persistent context (env, cwd, bash functions)   |
-| `src/integrations/vitest.ts` | Vitest integration (`registerMdTests`)         |
-| `src/integrations/bun.ts`  | Bun test runner integration                     |
-| `src/plugins/bash.ts`      | In-process bash plugin (up to 8x faster)        |
+| File                         | Purpose                                       |
+| ---------------------------- | --------------------------------------------- |
+| `src/index.ts`               | CLI entry point                               |
+| `src/markdown.ts`            | Markdown parsing, fence extraction            |
+| `src/executor.ts`            | Command execution, output matching            |
+| `src/session.ts`             | Persistent context (env, cwd, bash functions) |
+| `src/integrations/vitest.ts` | Vitest integration (`registerMdTests`)        |
+| `src/integrations/bun.ts`    | Bun test runner integration                   |
+| `src/plugins/bash.ts`        | In-process bash plugin (up to 8x faster)      |
 
 ## Subpath Exports
 
 ```typescript
-import { registerMdTests } from "@beorn/mdtest/vitest"   // Vitest integration
-import { registerMdTests } from "@beorn/mdtest/bun"       // Bun integration
-import { parseFences } from "@beorn/mdtest/core"           // Core parsing
-import { shellEscape } from "@beorn/mdtest/shell"          // Shell utilities
+import { registerMdTests } from "@beorn/mdtest/vitest" // Vitest integration
+import { registerMdTests } from "@beorn/mdtest/bun" // Bun integration
+import { parseFences } from "@beorn/mdtest/core" // Core parsing
+import { shellEscape } from "@beorn/mdtest/shell" // Shell utilities
 ```
 
 ## Code Style
