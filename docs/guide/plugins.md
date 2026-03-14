@@ -13,7 +13,7 @@ By default, mdtest executes console blocks by spawning bash subprocesses for eac
 A plugin is a TypeScript module that exports a factory function:
 
 ```typescript
-import type { Plugin, FileOpts, BlockOpts, ReplResult } from "@beorn/mdtest"
+import type { Plugin, FileOpts, BlockOpts, ReplResult } from "@beorn/mdtest/types"
 
 export default function myPlugin(fileOpts: FileOpts): Plugin {
   // File-level initialization
@@ -66,7 +66,7 @@ interface BlockOpts {
 interface ReplResult {
   stdout: string // Command output
   stderr: string // Error output
-  exitCode: number // Exit code (0 = success)
+  exitCode: number | null // Exit code (0 = success, null = unknown)
 }
 ```
 
@@ -122,7 +122,7 @@ Priority: **frontmatter** → **heading** → **fence** (later overrides earlier
 The default `bash` plugin extracts mdtest's current bash execution logic:
 
 ```typescript
-import { bash } from "@beorn/mdtest/plugins"
+import { bash } from "@beorn/mdtest/plugins/bash"
 
 export default function myPlugin(opts: FileOpts): Plugin {
   // Use bash for mixed commands
@@ -151,7 +151,7 @@ Real-world example from the km project:
 ```typescript
 // apps/km-cli/tests/mdtest-plugin.ts
 import { $ } from "bun"
-import type { Plugin, FileOpts, BlockOpts, ReplResult } from "@beorn/mdtest"
+import type { Plugin, FileOpts, BlockOpts, ReplResult } from "@beorn/mdtest/types"
 
 export default function kmPlugin(_opts: FileOpts): Plugin {
   return {
@@ -263,7 +263,7 @@ export default function myPlugin(opts: FileOpts): Plugin {
 }
 ```
 
-Note: `beforeAll` runs **after** the first block executes, allowing hooks to be defined in the first block (backward compatible with bash behavior).
+Note: Hook-defining blocks are pre-scanned and executed before any test blocks run, so `beforeAll()` can be defined in any block.
 
 ## State Management
 

@@ -199,7 +199,7 @@ export class CmdSession {
     const startTime = Date.now()
     let lastOutputTime = Date.now()
     let lastLen = 0
-    let exitCode = 0
+    let exitCode: number | null = null
 
     while (true) {
       const elapsed = Date.now() - startTime

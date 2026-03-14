@@ -39,7 +39,7 @@ export interface HeadingResult {
   level: number
   title: string
   slug: string
-  path: string[] // Hierarchical path: ['kimmi', 'import']
+  path: string[] // Hierarchical path: ['Setup', 'Import']
   commands: CommandResult[]
 }
 

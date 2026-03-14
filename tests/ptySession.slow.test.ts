@@ -345,8 +345,8 @@ done
       // Should wait for minWait since no marker
       expect(elapsed).toBeGreaterThanOrEqual(50)
       expect(result.stdout.toString().trim()).toBe("no marker")
-      // Exit code defaults to 0
-      expect(result.exitCode).toBe(0)
+      // Without OSC 133 marker, exit code is unknown (null)
+      expect(result.exitCode).toBeNull()
     } finally {
       await session.close()
     }

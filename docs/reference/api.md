@@ -7,7 +7,7 @@ mdtest exports its core types for plugin authors and integrations.
 ### Plugin Types
 
 ```typescript
-import type { Plugin, FileOpts, BlockOpts, ReplResult, ExecFn, PluginFactory } from "@beorn/mdtest"
+import type { Plugin, FileOpts, BlockOpts, ReplResult, ExecFn, PluginFactory } from "@beorn/mdtest/types"
 ```
 
 #### `ReplResult`
@@ -18,7 +18,7 @@ Result of executing a single command.
 interface ReplResult {
   stdout: string
   stderr: string
-  exitCode: number
+  exitCode: number | null
 }
 ```
 

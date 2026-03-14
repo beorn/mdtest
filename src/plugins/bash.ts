@@ -1,20 +1,32 @@
 // Bash plugin for mdtest - default execution mode
 // Extracts state-based bash execution logic into plugin interface
 
-import { mkdtempSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
-import { splitNorm } from "../core.js"
+import { dirname, join } from "node:path"
+import { splitNorm, trimTrailingEmptyLines } from "../core.js"
 import { buildScript, buildHookScript } from "../shell.js"
 import { bunShell } from "../integrations/bun.js"
 import { DEFAULTS } from "../constants.js"
-import type { Plugin, PluginFactory, FileOpts, BlockOpts, ExecFn, ReplResult } from "../types.js"
+import type { Plugin, FileOpts, BlockOpts, ExecFn, ReplResult } from "../types.js"
+import type { ShellResult, ShellOptions } from "../shell.js"
+
+/** Shell function signature matching bunShell/vitestShell */
+export type ShellFn = (cmd: string[], opts?: ShellOptions) => Promise<ShellResult>
+
+/** Options for the bash plugin factory */
+export interface BashPluginOptions {
+  /** Custom shell function. Defaults to bunShell. */
+  shellFn?: ShellFn
+}
 
 /**
  * Bash plugin - default mdtest execution mode
  * Uses stateful bash execution with env/cwd/function persistence
  */
-export const bash: PluginFactory = (opts: FileOpts): Plugin => {
+export function bash(opts: FileOpts, pluginOpts?: BashPluginOptions): Plugin {
+  const shell: ShellFn = pluginOpts?.shellFn ?? bunShell
+
   // Create temp directory for state files
   const stateDir = mkdtempSync(join(tmpdir(), "mdtest-"))
   const envFile = join(stateDir, ".env")
@@ -26,9 +38,11 @@ export const bash: PluginFactory = (opts: FileOpts): Plugin => {
   writeFileSync(cwdFile, process.cwd())
   writeFileSync(funcFile, "")
 
-  // Write all file= blocks to temp dir
+  // Write all file= blocks to cwd (the test's working directory)
+  const cwd = process.cwd()
   for (const [filename, content] of opts.files) {
-    const filePath = join(stateDir, filename)
+    const filePath = join(cwd, filename)
+    mkdirSync(dirname(filePath), { recursive: true })
     writeFileSync(filePath, content)
   }
 
@@ -67,7 +81,7 @@ export const bash: PluginFactory = (opts: FileOpts): Plugin => {
         const script = buildScript([cmd], blockOpts, envFile, cwdFile, funcFile)
 
         // Execute command
-        const res = await bunShell(["bash", "-lc", script], {
+        const res = await shell(["bash", "-lc", script], {
           cwd,
           env: process.env as Record<string, string>,
           timeout,
@@ -78,12 +92,8 @@ export const bash: PluginFactory = (opts: FileOpts): Plugin => {
         const stderr = splitNorm(res.stderr.toString())
 
         // Remove trailing empty lines
-        while (stdout.length > 0 && stdout[stdout.length - 1] === "") {
-          stdout.pop()
-        }
-        while (stderr.length > 0 && stderr[stderr.length - 1] === "") {
-          stderr.pop()
-        }
+        trimTrailingEmptyLines(stdout)
+        trimTrailingEmptyLines(stderr)
 
         return {
           stdout: stdout.join("\n"),
@@ -100,6 +110,12 @@ export const bash: PluginFactory = (opts: FileOpts): Plugin => {
 
     async afterAll(): Promise<void> {
       await callHook("afterAll")
+      // Clean up temp state directory
+      try {
+        rmSync(stateDir, { recursive: true, force: true })
+      } catch {
+        // Ignore cleanup errors
+      }
     },
 
     async beforeEach(): Promise<void> {
@@ -114,7 +130,7 @@ export const bash: PluginFactory = (opts: FileOpts): Plugin => {
   // Helper to call bash hooks
   async function callHook(hookName: string): Promise<void> {
     const script = buildHookScript(hookName, envFile, cwdFile, funcFile)
-    await bunShell(["bash", "-lc", script], {
+    await shell(["bash", "-lc", script], {
       cwd: process.cwd(),
       env: process.env as Record<string, string>,
     })

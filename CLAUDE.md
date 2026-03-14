@@ -14,34 +14,44 @@ bun run docs:dev      # Local docs dev server
 ## Architecture
 
 ```
-CLI (src/index.ts)
-  └── Loader (src/loader.ts) — find + parse .test.md files
-        └── Markdown parser (src/markdown.ts) — extract code fences
-              └── Executor (src/executor.ts) — run commands, compare output
-                    ├── Session (src/session.ts) — persistent env/cwd across blocks
-                    ├── PTY Session (src/ptySession.ts) — interactive shell (.slow.)
-                    └── Plugin Executor (src/plugin-executor.ts) — in-process plugins
+CLI (src/index.ts) — standalone runner with reporters
+  ├── Markdown parser (src/markdown.ts) — extract headings + code fences
+  ├── Core (src/core.ts) — pure parsing + pattern matching
+  └── Plugin Executor (src/plugin-executor.ts) — run blocks via plugins
+        ├── Loader (src/loader.ts) — resolve + load plugins
+        ├── Bash Plugin (src/plugins/bash.ts) — default bash execution
+        ├── CmdSession (src/cmdSession.ts) — persistent subprocess (cmd=)
+        └── PTY Session (src/ptySession.ts) — interactive shell via PTY
+
+Integrations (src/integrations/)
+  ├── shared.ts — common test registration logic
+  ├── vitest.ts — Vitest adapter
+  ├── bun.ts — Bun test adapter
+  └── vitest-plugin.ts — Vite plugin for .test.md transforms
 ```
 
 ## Key Files
 
-| File                         | Purpose                                       |
-| ---------------------------- | --------------------------------------------- |
-| `src/index.ts`               | CLI entry point                               |
-| `src/markdown.ts`            | Markdown parsing, fence extraction            |
-| `src/executor.ts`            | Command execution, output matching            |
-| `src/session.ts`             | Persistent context (env, cwd, bash functions) |
-| `src/integrations/vitest.ts` | Vitest integration (`registerMdTests`)        |
-| `src/integrations/bun.ts`    | Bun test runner integration                   |
-| `src/plugins/bash.ts`        | In-process bash plugin (up to 8x faster)      |
+| File                                | Purpose                                    |
+| ----------------------------------- | ------------------------------------------ |
+| `src/index.ts`                      | CLI entry point                            |
+| `src/core.ts`                       | Pure functions: parsing, pattern matching  |
+| `src/markdown.ts`                   | Markdown parsing, fence extraction         |
+| `src/plugin-executor.ts`            | Plugin-based block execution               |
+| `src/plugins/bash.ts`               | Default bash plugin with state persistence |
+| `src/integrations/shared.ts`        | Common test registration (Bun + Vitest)    |
+| `src/integrations/vitest.ts`        | Vitest integration (`registerMdTests`)     |
+| `src/integrations/bun.ts`           | Bun test runner integration                |
+| `src/integrations/vitest-plugin.ts` | Vite plugin for direct `.test.md` runs     |
 
 ## Subpath Exports
 
 ```typescript
 import { registerMdTests } from "@beorn/mdtest/vitest" // Vitest integration
 import { registerMdTests } from "@beorn/mdtest/bun" // Bun integration
-import { parseFences } from "@beorn/mdtest/core" // Core parsing
+import { parseBlock, matchLines } from "@beorn/mdtest/core" // Core parsing/matching
 import { shellEscape } from "@beorn/mdtest/shell" // Shell utilities
+import type { Plugin, FileOpts, BlockOpts, ReplResult } from "@beorn/mdtest/types" // Plugin types
 ```
 
 ## Code Style

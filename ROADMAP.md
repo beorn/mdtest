@@ -69,7 +69,7 @@ Scrut (Facebook's Rust-based Cram successor) provides a roadmap for mdtest enhan
   - Uses Node.js integration under the hood
   - Larger user base than Bun
 
-- [ ] **Vitest integration** - `src/integrations/vitest.ts`
+- [x] **Vitest integration** - `src/integrations/vitest.ts` (DONE)
   - Plugin for Vitest (similar to Bun integration)
   - Popular in Vue/React ecosystems
 

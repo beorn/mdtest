@@ -2,14 +2,23 @@
 
 Write tests in markdown. Run them as code.
 
+> Early release (0.x) -- API may evolve before 1.0.
+
 mdtest turns CLI documentation into executable tests. Write commands and expected output in `console` code fences, and mdtest runs them with persistent shell context, rich pattern matching, and snapshot updates. Your documentation stays accurate because it _is_ the test suite.
+
+> **Security note**: mdtest executes shell commands from markdown blocks. Do not run it on untrusted content.
+
+## Requirements
+
+- **Bun** >= 1.0.0 (runtime and package manager)
+- **Shell**: bash / POSIX shell (macOS, Linux; Windows via WSL)
 
 ## Quick Start
 
 Install:
 
 ```bash
-npm install -D @beorn/mdtest
+bun add -d @beorn/mdtest
 ```
 
 Write a test (`example.test.md`):
@@ -33,6 +42,16 @@ Run it:
 ```bash
 mdtest example.test.md
 ```
+
+### When Tests Fail
+
+When expected output changes, mdtest shows a colored diff. Update snapshots automatically:
+
+```bash
+mdtest --update example.test.md
+```
+
+The markdown file is rewritten in place with the actual output replacing the expected output.
 
 ## Features
 
@@ -131,7 +150,7 @@ bunx vitest run tests/md.test.ts
 
 ## Documentation
 
-Full documentation: [beorn.github.io/mdtest](https://beorn.github.io/mdtest/)
+Full documentation: [https://beorn.github.io/mdtest/](https://beorn.github.io/mdtest/)
 
 ## License
 

@@ -229,6 +229,41 @@ describe("matching", () => {
       expect(result.ok).toBe(false)
       expect(result.msg).toContain("line mismatch")
     })
+
+    test("ellipsis preserves captures from tail", () => {
+      const caps: Record<string, string> = {}
+      const result = matchLines(
+        ["header", "...", "ID: {{id:*}}", "done"],
+        ["header", "noise1", "noise2", "ID: ABC-123", "done"],
+        caps,
+      )
+      expect(result.ok).toBe(true)
+      expect(caps.id).toBe("ABC-123")
+    })
+
+    test("ellipsis preserves multiple captures from tail", () => {
+      const caps: Record<string, string> = {}
+      const result = matchLines(
+        ["start", "[...]", "name: {{name:*}}", "age: {{age:*}}"],
+        ["start", "skip1", "skip2", "name: Alice", "age: 30"],
+        caps,
+      )
+      expect(result.ok).toBe(true)
+      expect(caps.name).toBe("Alice")
+      expect(caps.age).toBe("30")
+    })
+
+    test("ellipsis captures available for reuse after match", () => {
+      // First match captures through ellipsis
+      const caps: Record<string, string> = {}
+      const result1 = matchLines(["...", "ID: {{id:*}}"], ["preamble", "ID: XYZ-789"], caps)
+      expect(result1.ok).toBe(true)
+      expect(caps.id).toBe("XYZ-789")
+
+      // Second match reuses the captured value
+      const result2 = matchLines(["Ref: {{id}}"], ["Ref: XYZ-789"], caps)
+      expect(result2.ok).toBe(true)
+    })
   })
 
   describe("patterns", () => {

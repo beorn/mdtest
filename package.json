@@ -1,14 +1,22 @@
 {
   "name": "@beorn/mdtest",
   "version": "0.2.0",
-  "description": "Bun-native Cram-style markdown testing with persistent context & snapshot updates",
+  "description": "Markdown test runner for CLI docs and shell transcripts. Cram-style console blocks, persistent shell context, pattern matching, and snapshot updates for Bun.",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
   "keywords": [
-    "bun",
-    "cli",
-    "cram",
-    "doctest",
     "markdown",
-    "test",
+    "markdown-testing",
+    "docs-as-tests",
+    "cli-testing",
+    "shell",
+    "bash",
+    "snapshot-testing",
+    "doctest",
+    "cram",
+    "trycmd",
+    "bun",
     "testing"
   ],
   "homepage": "https://beorn.github.io/mdtest/",
@@ -31,7 +39,6 @@
   "exports": {
     ".": "./src/index.ts",
     "./api": "./src/api.ts",
-    "./session": "./src/session.ts",
     "./bun": "./src/integrations/bun.ts",
     "./vitest": "./src/integrations/vitest.ts",
     "./vitest-plugin": "./src/integrations/vitest-plugin.ts",

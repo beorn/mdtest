@@ -283,220 +283,235 @@ async function testFile(
     let failures = 0
     let total = 0
     const replacements: Replacement[] = []
-    let beforeAllRan = false
     const capsStdout: Record<string, string> = {}
     const capsStderr: Record<string, string> = {}
     const headingBlockCounts = new Map<string, number>()
     const seenTestIds = new Set<string>()
     let lastHeadingText: string | null = null
 
-    // Run all blocks as tests
+    // Pre-scan: find blocks that define hook functions and execute them first
+    // This ensures beforeAll() can be defined in any block, not just the first
+    const hookPattern = /^\$ (beforeAll|afterAll|beforeEach|afterEach)\(\)/m
     for (let i = 0; i < fences.length; i++) {
       const f = fences[i]!
-      total++
-      const { commands, expect } = parseBlock(f.text)
-
-      // Generate test ID from nearest heading
-      const blockStartPos = positionToLineColumn(md, f.start)
-      const nearestHeading = findNearestHeading(headings, blockStartPos)
-      const testId = generateTestId(nearestHeading, i, headingBlockCounts)
-      const testName = `${path}#${testId}`
-      const headingText = nearestHeading?.text ?? testId
-      const headingDepth = nearestHeading?.depth ?? 1
-      const headingPrefix = "#".repeat(headingDepth)
-
-      // Validate for duplicate test IDs
-      if (seenTestIds.has(testId)) {
-        console.error(`\n❌ ERROR: Duplicate test ID detected: "${testId}"`)
-        console.error(`   Test IDs must be unique within a file.`)
-        console.error(`   This usually happens when two code blocks are at the same heading level.`)
-        console.error(`   Consider adding subheadings or unique identifiers to distinguish tests.\n`)
-        process.exit(1)
-      }
-      seenTestIds.add(testId)
-
-      if (!commands.length) {
-        total--
-        continue
-      }
-
-      const opts = parseInfo(f.info)
-      if (opts.reset) {
-        Object.keys(capsStdout).forEach((k) => delete capsStdout[k])
-        Object.keys(capsStderr).forEach((k) => delete capsStderr[k])
-      }
-
-      // Call beforeEach hook
-      await executor.beforeEach()
-
-      // Execute block using plugin
-      const blockResult = await executor.executeBlock({ lang: f.lang, info: f.info, text: f.text }, nearestHeading)
-
-      // Plugin didn't handle this block - skip it
-      if (!blockResult) {
-        total--
-        continue
-      }
-
-      const { results, exitCode } = blockResult
-      const stdout: string[] = results.flatMap((r) => r.stdout.map(stripAnsi))
-      const stderr: string[] = results.flatMap((r) => r.stderr.map(stripAnsi))
-
-      // Run beforeAll once, after first block that defines it
-      if (!beforeAllRan) {
-        await executor.beforeAll()
-        beforeAllRan = true
-      }
-
-      const wantExit = expect.exit ?? opts.exit ?? 0
-
-      const wantStdout = expect.stdout
-      const wantStderr = expect.stderr.length ? expect.stderr : []
-
-      const outMatch = matchLines(wantStdout, stdout, capsStdout)
-      const errMatch =
-        expect.stderr.length === 0
-          ? matchLines(
-              [],
-              stderr.filter((l) => l.length),
-              capsStderr,
-            )
-          : matchLines(
-              wantStderr,
-              stderr.filter((l) => l.length),
-              capsStderr,
-            )
-
-      const exitOk = exitCode === wantExit
-
-      if (outMatch.ok && errMatch.ok && exitOk) {
-        if (TAP) {
-          // TAP mode: ok line
-          console.log(`ok ${total} - ${testName}`)
-        } else if (DOTS) {
-          // Dots mode: just print a dot for passing tests
-          process.stdout.write("\x1b[32m.\x1b[0m")
-        } else {
-          // Output test heading (markdown format) - only if changed
-          if (headingText !== lastHeadingText) {
-            if (lastHeadingText !== null) console.log("")
-            console.log(`${headingPrefix} ${headingText}`)
-            console.log("") // Blank line after heading
-            lastHeadingText = headingText
-          }
-
-          // Output body text if --show-body is enabled
-          if (f.body) {
-            console.log(f.body)
-            console.log("") // Blank line after body
-          }
-
-          // Output each command with its output (indented for markdown)
-          const nonHookResults = results.filter((r) => !r.command.startsWith(">"))
-          for (let i = 0; i < nonHookResults.length; i++) {
-            const { command, stdout: cmdStdout } = nonHookResults[i]!
-            formatCommandLines(command, "32", "✓").forEach((l) => console.log(l))
-            cmdStdout.forEach((line: string) => console.log(`      ${maybeTrunc(line)}`))
-            // Add blank line between commands only if current command has output or not last
-            const hasOutput = cmdStdout.length > 0
-            const isLast = i === nonHookResults.length - 1
-            if (!isLast && (hasOutput || nonHookResults[i + 1]!.stdout.length > 0)) {
-              console.log("")
-            }
-          }
-          console.log("") // Blank line after test
-        }
-      } else {
-        failures++
-
-        // TAP mode: not ok line with YAML diagnostics
-        if (TAP) {
-          console.log(`not ok ${total} - ${testName}`)
-          console.log("  ---")
-          if (!outMatch.ok) {
-            console.log(`  message: stdout mismatch`)
-          } else if (!errMatch.ok) {
-            console.log(`  message: stderr mismatch`)
-          } else if (!exitOk) {
-            console.log(`  message: exit code ${exitCode}, expected ${wantExit}`)
-          }
-          console.log("  ...")
-        } else if (DOTS) {
-          // In dots mode, print newline and file context before failure details
-          console.error(`\n\n${path}#${testId}:`)
-        }
-
-        // Output test heading (markdown format) - only if changed (skip in dots/TAP mode)
-        if (!DOTS && !TAP && headingText !== lastHeadingText) {
-          if (lastHeadingText !== null) console.error("")
-          console.error(`${headingPrefix} ${headingText}`)
-          console.error("") // Blank line after heading
-          lastHeadingText = headingText
-        }
-
-        // Output body text if --show-body is enabled (skip in dots/TAP mode)
-        if (!DOTS && !TAP && f.body) {
-          console.error(f.body)
-          console.error("") // Blank line after body
-        }
-
-        // Output each command with failure indicator (indented for markdown) - skip in TAP mode
-        if (!TAP) {
-          const nonHookResults = results.filter((r) => !r.command.startsWith(">"))
-          for (const { command } of nonHookResults) {
-            formatCommandLines(command, "31", "✗").forEach((l) => console.error(l))
-          }
-          console.error("") // Blank line before error details
-
-          if (!outMatch.ok) {
-            console.error(hintMismatch("stdout", wantStdout, stdout, outMatch.msg))
-          }
-          if (!errMatch.ok) {
-            console.error(hintMismatch("stderr", wantStderr, stderr, errMatch.msg))
-          }
-          if (!exitOk) {
-            console.error(`exit code: expected ${wantExit}, got ${exitCode}`)
-          }
-          console.error("") // Blank line after test
-        }
-      }
-
-      // Call afterEach hook (run even on failure)
-      await executor.afterEach()
-
-      // Update logic if test failed
-      if (!(outMatch.ok && errMatch.ok && exitOk) && UPDATE) {
-        // Warn if block has wildcards/regex/ellipsis patterns (but still update)
-        if (hasPatterns(f.text)) {
-          console.error(`⚠️  ${testName} contains patterns - updating anyway (patterns will be replaced)`)
-          console.error(`   Patterns found: wildcards {{...}}, regex /.../, or ellipsis ...`)
-          console.error(`   Review changes carefully before committing`)
-        }
-
-        // Rebuild the fence with actual output
-        const rebuilt: string[] = []
-        // keep commands and continuations
-        for (const c of f.text.split("\n")) {
-          if (c.startsWith("$ ") || c.startsWith("> ")) rebuilt.push(c)
-        }
-
-        // stdout
-        if (stdout.length) rebuilt.push(...stdout)
-        // stderr (only if non-empty)
-        const nonBlankErr = stderr.filter((l) => l.length)
-        if (nonBlankErr.length) {
-          for (const l of stderr) rebuilt.push(l.length ? `! ${l}` : l)
-        }
-        // exit code
-        if (exitCode !== 0) rebuilt.push(`[${exitCode}]`)
-
-        const newFence = "```" + f.lang + (f.info ? " " + f.info : "") + "\n" + rebuilt.join("\n") + "\n```"
-        replacements.push({ start: f.start, end: f.end, newText: newFence })
+      if (hookPattern.test(f.text)) {
+        // Execute hook-defining block to populate funcFile
+        const blockStartPos = positionToLineColumn(md, f.start)
+        const nearestHeading = findNearestHeading(headings, blockStartPos)
+        await executor.executeBlock({ lang: f.lang, info: f.info, text: f.text }, nearestHeading)
       }
     }
 
-    // Call afterAll hook (run even on failure)
-    await executor.afterAll()
+    // Call beforeAll once, before any test block runs
+    await executor.beforeAll()
+
+    // Run all blocks as tests — wrapped in try/finally to guarantee afterAll runs
+    try {
+      for (let i = 0; i < fences.length; i++) {
+        const f = fences[i]!
+        total++
+        const { commands, expect } = parseBlock(f.text)
+
+        // Generate test ID from nearest heading
+        const blockStartPos = positionToLineColumn(md, f.start)
+        const nearestHeading = findNearestHeading(headings, blockStartPos)
+        const testId = generateTestId(nearestHeading, i, headingBlockCounts)
+        const testName = `${path}#${testId}`
+        const headingText = nearestHeading?.text ?? testId
+        const headingDepth = nearestHeading?.depth ?? 1
+        const headingPrefix = "#".repeat(headingDepth)
+
+        // Validate for duplicate test IDs
+        if (seenTestIds.has(testId)) {
+          console.error(`\n❌ ERROR: Duplicate test ID detected: "${testId}"`)
+          console.error(`   Test IDs must be unique within a file.`)
+          console.error(`   This usually happens when two code blocks are at the same heading level.`)
+          console.error(`   Consider adding subheadings or unique identifiers to distinguish tests.\n`)
+          process.exit(1)
+        }
+        seenTestIds.add(testId)
+
+        if (!commands.length) {
+          total--
+          continue
+        }
+
+        const opts = parseInfo(f.info)
+        if (opts.reset) {
+          Object.keys(capsStdout).forEach((k) => delete capsStdout[k])
+          Object.keys(capsStderr).forEach((k) => delete capsStderr[k])
+        }
+
+        // Call beforeEach hook
+        await executor.beforeEach()
+
+        // Wrap block execution + comparison in try/finally to guarantee afterEach runs
+        try {
+          // Execute block using plugin
+          const blockResult = await executor.executeBlock({ lang: f.lang, info: f.info, text: f.text }, nearestHeading)
+
+          // Plugin didn't handle this block - skip it
+          if (!blockResult) {
+            total--
+            continue
+          }
+
+          const { results, exitCode } = blockResult
+          const stdout: string[] = results.flatMap((r) => r.stdout.map(stripAnsi))
+          const stderr: string[] = results.flatMap((r) => r.stderr.map(stripAnsi))
+
+          const wantExit = expect.exit ?? opts.exit ?? 0
+
+          const wantStdout = expect.stdout
+          const wantStderr = expect.stderr.length ? expect.stderr : []
+
+          const outMatch = matchLines(wantStdout, stdout, capsStdout)
+          const errMatch =
+            expect.stderr.length === 0
+              ? matchLines(
+                  [],
+                  stderr.filter((l) => l.length),
+                  capsStderr,
+                )
+              : matchLines(
+                  wantStderr,
+                  stderr.filter((l) => l.length),
+                  capsStderr,
+                )
+
+          // null exitCode means "unknown" (no OSC 133 available) — treat as passing
+          const exitOk = exitCode === null || exitCode === wantExit
+
+          if (outMatch.ok && errMatch.ok && exitOk) {
+            if (TAP) {
+              // TAP mode: ok line
+              console.log(`ok ${total} - ${testName}`)
+            } else if (DOTS) {
+              // Dots mode: just print a dot for passing tests
+              process.stdout.write("\x1b[32m.\x1b[0m")
+            } else {
+              // Output test heading (markdown format) - only if changed
+              if (headingText !== lastHeadingText) {
+                if (lastHeadingText !== null) console.log("")
+                console.log(`${headingPrefix} ${headingText}`)
+                console.log("") // Blank line after heading
+                lastHeadingText = headingText
+              }
+
+              // Output body text if --show-body is enabled
+              if (f.body) {
+                console.log(f.body)
+                console.log("") // Blank line after body
+              }
+
+              // Output each command with its output (indented for markdown)
+              const nonHookResults = results.filter((r) => !r.command.startsWith(">"))
+              for (let i = 0; i < nonHookResults.length; i++) {
+                const { command, stdout: cmdStdout } = nonHookResults[i]!
+                formatCommandLines(command, "32", "✓").forEach((l) => console.log(l))
+                cmdStdout.forEach((line: string) => console.log(`      ${maybeTrunc(line)}`))
+                // Add blank line between commands only if current command has output or not last
+                const hasOutput = cmdStdout.length > 0
+                const isLast = i === nonHookResults.length - 1
+                if (!isLast && (hasOutput || nonHookResults[i + 1]!.stdout.length > 0)) {
+                  console.log("")
+                }
+              }
+              console.log("") // Blank line after test
+            }
+          } else {
+            failures++
+
+            // TAP mode: not ok line with YAML diagnostics
+            if (TAP) {
+              console.log(`not ok ${total} - ${testName}`)
+              console.log("  ---")
+              if (!outMatch.ok) {
+                console.log(`  message: stdout mismatch`)
+              } else if (!errMatch.ok) {
+                console.log(`  message: stderr mismatch`)
+              } else if (!exitOk) {
+                console.log(`  message: exit code ${exitCode}, expected ${wantExit}`)
+              }
+              console.log("  ...")
+            } else if (DOTS) {
+              // In dots mode, print newline and file context before failure details
+              console.error(`\n\n${path}#${testId}:`)
+            }
+
+            // Output test heading (markdown format) - only if changed (skip in dots/TAP mode)
+            if (!DOTS && !TAP && headingText !== lastHeadingText) {
+              if (lastHeadingText !== null) console.error("")
+              console.error(`${headingPrefix} ${headingText}`)
+              console.error("") // Blank line after heading
+              lastHeadingText = headingText
+            }
+
+            // Output body text if --show-body is enabled (skip in dots/TAP mode)
+            if (!DOTS && !TAP && f.body) {
+              console.error(f.body)
+              console.error("") // Blank line after body
+            }
+
+            // Output each command with failure indicator (indented for markdown) - skip in TAP mode
+            if (!TAP) {
+              const nonHookResults = results.filter((r) => !r.command.startsWith(">"))
+              for (const { command } of nonHookResults) {
+                formatCommandLines(command, "31", "✗").forEach((l) => console.error(l))
+              }
+              console.error("") // Blank line before error details
+
+              if (!outMatch.ok) {
+                console.error(hintMismatch("stdout", wantStdout, stdout, outMatch.msg))
+              }
+              if (!errMatch.ok) {
+                console.error(hintMismatch("stderr", wantStderr, stderr, errMatch.msg))
+              }
+              if (!exitOk) {
+                console.error(`exit code: expected ${wantExit}, got ${exitCode}`)
+              }
+              console.error("") // Blank line after test
+            }
+          }
+
+          // Update logic if test failed
+          if (!(outMatch.ok && errMatch.ok && exitOk) && UPDATE) {
+            // Warn if block has wildcards/regex/ellipsis patterns (but still update)
+            if (hasPatterns(f.text)) {
+              console.error(`⚠️  ${testName} contains patterns - updating anyway (patterns will be replaced)`)
+              console.error(`   Patterns found: wildcards {{...}}, regex /.../, or ellipsis ...`)
+              console.error(`   Review changes carefully before committing`)
+            }
+
+            // Rebuild the fence with actual output
+            const rebuilt: string[] = []
+            // keep commands and continuations
+            for (const c of f.text.split("\n")) {
+              if (c.startsWith("$ ") || c.startsWith("> ")) rebuilt.push(c)
+            }
+
+            // stdout
+            if (stdout.length) rebuilt.push(...stdout)
+            // stderr (only if non-empty)
+            const nonBlankErr = stderr.filter((l) => l.length)
+            if (nonBlankErr.length) {
+              for (const l of stderr) rebuilt.push(l.length ? `! ${l}` : l)
+            }
+            // exit code (null means unknown — omit from snapshot)
+            if (exitCode !== null && exitCode !== 0) rebuilt.push(`[${exitCode}]`)
+
+            const newFence = "```" + f.lang + (f.info ? " " + f.info : "") + "\n" + rebuilt.join("\n") + "\n```"
+            replacements.push({ start: f.start, end: f.end, newText: newFence })
+          }
+        } finally {
+          // Call afterEach hook — guaranteed even on error/exception
+          await executor.afterEach()
+        }
+      }
+    } finally {
+      // Call afterAll hook — guaranteed even on error/exception
+      await executor.afterAll()
+    }
 
     return { fails: failures, total, replacements }
   } finally {

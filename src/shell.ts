@@ -8,7 +8,7 @@ import type { BlockOptions } from "./api.js"
 export interface ShellResult {
   stdout: Buffer
   stderr: Buffer
-  exitCode: number
+  exitCode: number | null
 }
 
 export interface ShellOptions {

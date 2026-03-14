@@ -6,7 +6,7 @@
 export interface ReplResult {
   stdout: string
   stderr: string
-  exitCode: number
+  exitCode: number | null
 }
 
 /**

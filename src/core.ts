@@ -149,6 +149,13 @@ export function splitNorm(s: string): string[] {
   return s.replace(/\r\n/g, "\n").split("\n").map(normLine)
 }
 
+/** Remove trailing empty strings from an array (mutates in place) */
+export function trimTrailingEmptyLines(lines: string[]): void {
+  while (lines.length > 0 && lines[lines.length - 1] === "") {
+    lines.pop()
+  }
+}
+
 function escapeRegex(s: string): string {
   return s.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")
 }
@@ -222,8 +229,12 @@ export function matchLines(
       const tail = expected.slice(i + 1)
       if (tail.length === 0) return { ok: true }
       for (let k = j; k <= actual.length; k++) {
-        const probe = matchLines(tail, actual.slice(k), { ...caps })
-        if (probe.ok) return { ok: true }
+        const probeCaps = { ...caps }
+        const probe = matchLines(tail, actual.slice(k), probeCaps)
+        if (probe.ok) {
+          Object.assign(caps, probeCaps)
+          return { ok: true }
+        }
       }
       return {
         ok: false,

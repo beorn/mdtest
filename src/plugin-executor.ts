@@ -7,6 +7,13 @@ import { parseFrontmatter, mergeOptions, parseHeadingOptions } from "./options.j
 import { parseInfo } from "./core.js"
 import type { Heading, CodeBlock } from "./markdown.js"
 
+/** Remove trailing empty strings from an array, preserving internal empty strings */
+function trimTrailingEmpty(lines: string[]): string[] {
+  let end = lines.length
+  while (end > 0 && lines[end - 1] === "") end--
+  return lines.slice(0, end)
+}
+
 /**
  * Plugin-based file executor
  * Manages plugin lifecycle for a single test file
@@ -58,7 +65,7 @@ export class PluginExecutor {
     heading: Heading | null,
   ): Promise<{
     results: Array<{ command: string; stdout: string[]; stderr: string[] }>
-    exitCode: number
+    exitCode: number | null
   } | null> {
     if (!this.plugin) {
       throw new Error("PluginExecutor not initialized - call initialize() first")
@@ -100,7 +107,7 @@ export class PluginExecutor {
       stdout: string[]
       stderr: string[]
     }> = []
-    let lastExitCode = 0
+    let lastExitCode: number | null = 0
 
     for (const cmd of commands) {
       const result = await exec(cmd)
@@ -110,8 +117,8 @@ export class PluginExecutor {
       }
       results.push({
         command: cmd,
-        stdout: result.stdout ? result.stdout.split("\n").filter((l) => l !== "") : [],
-        stderr: result.stderr ? result.stderr.split("\n").filter((l) => l !== "") : [],
+        stdout: result.stdout ? trimTrailingEmpty(result.stdout.split("\n")) : [],
+        stderr: result.stderr ? trimTrailingEmpty(result.stderr.split("\n")) : [],
       })
       lastExitCode = result.exitCode
     }
@@ -180,17 +187,17 @@ export class PluginExecutor {
     let currentCommand: string[] = []
 
     for (const line of text.split("\n")) {
-      if (line.startsWith("$")) {
+      if (line.startsWith("$ ")) {
         // New command - save previous if exists
         if (currentCommand.length > 0) {
           commands.push(currentCommand.join("\n"))
           currentCommand = []
         }
-        // Add command without $ prefix
-        currentCommand.push(line.slice(1).trimStart())
-      } else if (line.startsWith(">")) {
+        // Add command without "$ " prefix
+        currentCommand.push(line.slice(2))
+      } else if (line.startsWith("> ")) {
         // Continuation line
-        currentCommand.push(line.slice(1).trimStart())
+        currentCommand.push(line.slice(2))
       }
       // Ignore expected output lines and blank lines
     }
