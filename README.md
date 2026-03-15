@@ -4,41 +4,7 @@
 
 **Your docs are your tests. Write CLI commands and expected output in markdown code fences — mdspec runs them with persistent shell context, pattern matching, and snapshot updates.**
 
-> Early release (0.x) — API may evolve before 1.0. mdspec executes shell commands from markdown blocks; do not run it on untrusted content.
-
-## Why mdspec?
-
-Testing CLI tools shouldn't require a separate testing DSL. Your README already shows commands and their output — mdspec makes those examples executable. When your docs drift from reality, your tests fail.
-
-**Design goals:**
-
-- **Docs as tests** — no separate test files, no custom syntax. Standard markdown with console code fences.
-- **Persistent context** — environment variables, working directory, and shell state carry across blocks within a file, just like a real terminal session.
-- **Pattern matching** — wildcards, regex, and named captures for dynamic output (timestamps, UUIDs, paths).
-- **Snapshot updates** — when output changes, `mdspec --update` rewrites the markdown in place.
-- **Plugin system** — replace shell execution with in-process plugins for 8x faster test runs.
-- **Test runner integration** — runs as a Vitest plugin or Bun test adapter, not just a standalone CLI.
-
-## Related Projects
-
-mdspec draws inspiration from and improves upon:
-
-| Project                                                            | Language | How mdspec differs                                                                                         |
-| ------------------------------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------- |
-| [Cram](https://bitheap.org/cram/)                                  | Python   | Markdown-native (not `.t` files), persistent context across blocks, plugin system, test runner integration |
-| [trycmd](https://github.com/assert-rs/trycmd)                      | Rust     | Not Rust-specific, supports regex/captures, REPL testing, in-process plugins                               |
-| [mdbook-cmdrun](https://github.com/FauconFan/mdbook-cmdrun)        | Rust     | Bidirectional (asserts output, not just generates it), snapshot updates, pattern matching                  |
-| [doctest](https://docs.python.org/3/library/doctest.html)          | Python   | Shell commands (not Python expressions), cross-language, persistent state                                  |
-| [shelltestrunner](https://github.com/simonmichael/shelltestrunner) | Haskell  | Standard markdown format, captures, plugins, integrated with JS test runners                               |
-
-## Requirements
-
-- **Bun** >= 1.0.0 (runtime and package manager)
-- **Shell**: bash / POSIX shell (macOS, Linux; Windows via WSL)
-
 ## Quick Start
-
-Install:
 
 ```bash
 bun add -d mdspec
@@ -66,54 +32,46 @@ Run it:
 mdspec example.spec.md
 ```
 
-### When Tests Fail
-
-When expected output changes, mdspec shows a colored diff. Update snapshots automatically:
+When output changes, update snapshots in place:
 
 ```bash
 mdspec --update example.spec.md
 ```
 
-The markdown file is rewritten in place with the actual output replacing the expected output.
-
 ## Features
 
 ### Pattern Matching
 
-Match dynamic output with wildcards, regex, and named captures:
+Wildcards, regex, and named captures for dynamic output:
 
 ````markdown
 ```console
 $ uuidgen
 {{id:/[0-9A-F-]{36}/}}
 ```
-
-```console
-$ echo "Your ID: {{id}}"
-Your ID: {{id}}
-```
 ````
 
-Ellipsis wildcards (`[...]` or `...`) match any text inline or zero or more lines when alone on a line.
+Ellipsis wildcards (`[...]` or `...`) match any text inline or across lines.
 
 ### Persistent Context
 
-Environment variables, working directory, and bash functions carry across blocks:
+Shell state carries across separate code fences — env vars, working directory, functions all persist within a file:
 
 ````markdown
 ```console
-$ export NAME="world"
+$ export DB="postgres://localhost/myapp"
+$ createdb myapp
 ```
 
 ```console
-$ echo "Hello, $NAME!"
-Hello, world!
+$ my-cli migrate --db "$DB"
+Applied 3 migrations.
 ```
 ````
 
 ### Plugins
 
-Replace bash subprocess execution with in-process plugins for up to 8x faster test runs:
+Replace shell execution with in-process TypeScript plugins for dramatically faster test runs:
 
 ```markdown
 ---
@@ -124,7 +82,7 @@ mdspec:
 
 ### REPL Testing
 
-Test interactive shells with persistent subprocess mode and OSC 133 completion detection:
+Test interactive REPLs with persistent subprocess mode:
 
 ````markdown
 ```console cmd="node -i"
@@ -135,20 +93,14 @@ $ 'hello'.toUpperCase()
 ```
 ````
 
-### Helper Files
+### Test Runner Integration
 
-Create test fixtures from code fences:
+Runs inside Vitest or Bun — same config, reporters, and CI you already have:
 
-````markdown
-```json file=config.json
-{ "port": 3000 }
+```typescript
+import { registerMdTests } from "mdspec/vitest"
+await registerMdTests("tests/**/*.spec.md")
 ```
-
-```console
-$ cat config.json
-{ "port": 3000 }
-```
-````
 
 ## CLI
 
@@ -159,21 +111,32 @@ mdspec --dots tests/*.spec.md   # Compact dots reporter
 mdspec --tap tests/*.spec.md    # TAP output
 ```
 
-## Vitest Integration
+## How mdspec Is Different
 
-```typescript
-// tests/md.test.ts
-import { registerMdTests } from "mdspec/vitest"
-await registerMdTests("tests/**/*.spec.md")
-```
+Most CLI testing tools were built for a specific language ecosystem or require custom file formats. mdspec takes a different approach:
 
-```bash
-bunx vitest run tests/md.test.ts
-```
+**Standard markdown, not custom formats.** Tests are `.md` files that render on GitHub, in docs sites, and in editors. No `.t` files, no TOML manifests, no new syntax to learn. If you already write console examples in your README, you're halfway there.
+
+**JavaScript-native with in-process plugins.** For JS/TS CLIs, plugins bypass the shell entirely — your test calls your code as a function, not a subprocess. This is unique to mdspec and makes tests dramatically faster.
+
+**Integrated, not standalone.** mdspec runs inside Vitest or Bun's test runner with the same config, reporters, and CI you already have. No separate tool to install, no parallel test pipeline to maintain.
+
+| | mdspec | [Cram](https://bitheap.org/cram/) | [trycmd](https://github.com/assert-rs/trycmd) | [shelltestrunner](https://github.com/simonmichael/shelltestrunner) | [doctest](https://docs.python.org/3/library/doctest.html) |
+|---|---|---|---|---|---|
+| Ecosystem | JS/TS (Bun) | Python | Rust | Haskell | Python |
+| Format | Markdown | `.t` files | TOML + `.md` | Custom | Docstrings |
+| In-process | Plugins | No | No | No | Yes |
+| Test runner | Vitest, Bun | Standalone | cargo test | Standalone | unittest |
+| Persistent context | Across fences | Per block | Per file | No | No |
+| Named captures | Yes | No | No | No | No |
 
 ## Documentation
 
-Full documentation: [https://beorn.github.io/mdspec/](https://beorn.github.io/mdspec/)
+Full documentation: [beorn.github.io/mdspec](https://beorn.github.io/mdspec/)
+
+## Security
+
+mdspec executes shell commands from markdown blocks. Do not run it on untrusted content.
 
 ## License
 
