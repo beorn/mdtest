@@ -78,10 +78,6 @@
     "vitepress": "^1.6.4",
     "vitest": "^3.0.0"
   },
-  "engines": {
-    "bun": ">=1.0.0",
-    "node": ">=18"
-  },
   "peerDependencies": {
     "node-pty": ">=1.0.0"
   },
@@ -89,5 +85,9 @@
     "node-pty": {
       "optional": true
     }
+  },
+  "engines": {
+    "bun": ">=1.0.0",
+    "node": ">=18"
   }
 }
