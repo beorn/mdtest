@@ -1,6 +1,6 @@
 {
   "name": "mdspec",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Markdown test runner for CLI docs and shell transcripts. Cram-style console blocks, persistent shell context, pattern matching, and snapshot updates for Bun.",
   "keywords": [
     "bash",
