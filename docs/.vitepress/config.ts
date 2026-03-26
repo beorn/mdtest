@@ -4,7 +4,10 @@ export default defineConfig({
   title: "mdspec",
   description: "Write tests in markdown. Run them as code.",
   base: "/mdspec/",
-  head: [["link", { rel: "icon", type: "image/svg+xml", href: "/mdspec/favicon.svg" }]],
+  head: [
+    ["link", { rel: "icon", type: "image/svg+xml", href: "/mdspec/favicon.svg" }],
+    ["script", { defer: "", src: "https://static.cloudflareinsights.com/beacon.min.js", "data-cf-beacon": '{"token": "d9b13df1eca0424c884faea71f34e09f"}' }],
+  ],
   themeConfig: {
     nav: [
       { text: "Guide", link: "/guide/getting-started" },
