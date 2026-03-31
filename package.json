@@ -72,11 +72,14 @@
     "@types/bun": "latest",
     "@types/debug": "^4.1.12",
     "@types/mdast": "^4.0.4",
+    "@types/node": "^22.0.0",
     "commander": "^14.0.1",
+    "loggily": "^0.4.2",
     "typescript": "latest",
     "vite": "^6.0.0",
     "vitepress": "^1.6.4",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "zod": "^3.0.0"
   },
   "peerDependencies": {
     "node-pty": ">=1.0.0"
