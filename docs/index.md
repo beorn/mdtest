@@ -4,7 +4,7 @@ layout: home
 hero:
   name: mdspec
   text: "Executable Markdown Testing"
-  tagline: "Your docs are your tests. Persistent context, pattern matching, named captures, and snapshots. Runs in Vitest and Bun."
+  tagline: "Documentation drifts from code. READMEs show commands that no longer work. API examples break silently. mdspec makes your docs executable — if the example is wrong, the test fails."
   actions:
     - theme: brand
       text: Get Started
