@@ -6,10 +6,23 @@
 
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join, basename } from "node:path"
-import { parseTape, createTerminal, screenshotSvg } from "@termless/core"
-import type { TapeCommand, Terminal, SvgScreenshotOptions } from "@termless/core"
-import { createVt100Backend } from "@termless/vt100"
 import type { Plugin, FileOpts, BlockOpts, ExecFn, ReplResult } from "../types.js"
+
+// Termless imports are dynamic to avoid tsc errors in standalone CI
+// (these packages are optional peer deps, only available in the km monorepo)
+type TapeCommand = { type: string; text: string; key: string; count?: number; value: string; path?: string }
+type Terminal = { feed(data: string): void; cols: number; rows: number; resize(cols: number, rows: number): void; close(): Promise<void> }
+
+async function loadTermless() {
+  const core = await import("@termless/core")
+  const vt100 = await import("@termless/vt100")
+  return {
+    parseTape: core.parseTape as (content: string) => { commands: TapeCommand[]; settings: Record<string, string> },
+    createTerminal: core.createTerminal as (opts: { backend: unknown; cols: number; rows: number }) => Terminal,
+    screenshotSvg: core.screenshotSvg as (term: unknown, opts?: { fontSize?: number }) => string,
+    createVt100Backend: vt100.createVt100Backend as (opts?: { cols?: number; rows?: number }) => unknown,
+  }
+}
 
 // ── Defaults ──
 
@@ -145,6 +158,9 @@ export default function tapePlugin(opts: FileOpts): Plugin {
 
       // Return executor — receives the full tape block content
       return async (content: string): Promise<ReplResult> => {
+        // Lazy-load termless (optional peer dep)
+        const { parseTape, createTerminal, screenshotSvg, createVt100Backend } = await loadTermless()
+
         // Parse tape commands
         const tape = parseTape(content)
 
@@ -186,7 +202,7 @@ export default function tapePlugin(opts: FileOpts): Plugin {
               const filename = name.endsWith(".svg") ? name : `${name}.svg`
 
               // Generate SVG screenshot
-              const svgOpts: SvgScreenshotOptions = { fontSize }
+              const svgOpts = { fontSize }
               const svg = screenshotSvg(term, svgOpts)
 
               // Ensure snapshot directory exists
