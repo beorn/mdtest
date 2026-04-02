@@ -14,8 +14,11 @@ type TapeCommand = { type: string; text: string; key: string; count?: number; va
 type Terminal = { feed(data: string): void; cols: number; rows: number; resize(cols: number, rows: number): void; close(): Promise<void> }
 
 async function loadTermless() {
-  const core = await import("@termless/core")
-  const vt100 = await import("@termless/vt100")
+  // Variable indirection prevents tsc from resolving these optional peer deps
+  const corePkg = "@termless/core"
+  const vt100Pkg = "@termless/vt100"
+  const core = await import(/* @vite-ignore */ corePkg)
+  const vt100 = await import(/* @vite-ignore */ vt100Pkg)
   return {
     parseTape: core.parseTape as (content: string) => { commands: TapeCommand[]; settings: Record<string, string> },
     createTerminal: core.createTerminal as (opts: { backend: unknown; cols: number; rows: number }) => Terminal,
