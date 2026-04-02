@@ -99,7 +99,9 @@ export class PluginExecutor {
     if (!exec) return null
 
     // Parse commands from block
-    const commands = this.extractCommands(block.text)
+    // Shell blocks use $ prefix parsing; non-shell blocks pass content as-is
+    const isShell = block.lang === "console" || block.lang === "sh" || block.lang === "bash"
+    const commands = isShell ? this.extractCommands(block.text) : [block.text]
 
     // Execute each command
     const results: Array<{

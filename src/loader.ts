@@ -6,11 +6,22 @@ import type { PluginFactory } from "./types.js"
 import { bash } from "./plugins/bash.js"
 
 /**
- * Built-in plugins
+ * Built-in plugins — static imports for common plugins, lazy for optional ones
  */
-const BUILTIN_PLUGINS: Record<string, PluginFactory> = {
+const BUILTIN_PLUGINS: Record<string, PluginFactory | (() => Promise<PluginFactory>)> = {
   bash,
   sh: bash, // alias
+  tape: () => import("./plugins/tape.js").then((m) => m.default),
+}
+
+/**
+ * Maps plugin names to the code block languages they accept.
+ * Used by the test integration layer to discover which blocks to process.
+ */
+export const PLUGIN_LANGUAGES: Record<string, string[]> = {
+  bash: ["console", "sh", "bash"],
+  sh: ["console", "sh", "bash"],
+  tape: ["tape"],
 }
 
 /**
@@ -28,11 +39,15 @@ const BUILTIN_PLUGINS: Record<string, PluginFactory> = {
 export async function loadPlugin(specifier: string, testFilePath: string): Promise<PluginFactory> {
   // Built-in plugin?
   if (specifier in BUILTIN_PLUGINS) {
-    const plugin = BUILTIN_PLUGINS[specifier]
-    if (!plugin) {
+    const entry = BUILTIN_PLUGINS[specifier]
+    if (!entry) {
       throw new Error(`Built-in plugin ${specifier} not found`)
     }
-    return plugin
+    // Lazy loaders are zero-arg functions; PluginFactory takes 1+ args (FileOpts)
+    if (typeof entry === "function" && entry.length === 0) {
+      return await (entry as () => Promise<PluginFactory>)()
+    }
+    return entry as PluginFactory
   }
 
   // Relative or absolute path - resolve from test file location

@@ -10,6 +10,8 @@ import { parseMarkdown, findNearestHeading, generateTestId } from "../markdown.j
 import type { Heading, CodeBlock } from "../markdown.js"
 import { readFile } from "fs/promises"
 import { PluginExecutor } from "../plugin-executor.js"
+import { parseFrontmatter } from "../options.js"
+import { PLUGIN_LANGUAGES } from "../loader.js"
 
 // Constants
 const MAX_TEST_NAME_LENGTH = 60
@@ -65,16 +67,32 @@ export async function registerMdTestFile(adapter: FrameworkAdapter, filePath: st
   const absPath = isAbsolute(filePath) ? filePath : resolve(filePath)
   const md = await readFile(absPath, "utf8")
   const { headings, codeBlocks } = parseMarkdown(md)
-  const structure = buildTestStructure(codeBlocks, headings)
+
+  // Determine which languages are valid based on the plugin
+  const frontmatter = parseFrontmatter(md)
+  const pluginName = (frontmatter.plugin as string) ?? "bash"
+  const pluginLangs = PLUGIN_LANGUAGES[pluginName]
+  const acceptedLangs = pluginLangs ?? ["console", "sh", "bash"]
+
+  const structure = buildTestStructure(codeBlocks, headings, acceptedLangs)
   const displayName = basename(absPath)
   registerTests(adapter, displayName, absPath, md, structure, codeBlocks, headings)
 }
 
+// ============ Constants ============
+
+const SHELL_LANGS = new Set(["console", "sh", "bash"])
+
 // ============ Test Structure ============
 
-function buildTestStructure(codeBlocks: CodeBlock[], headings: Heading[]): TestStructure {
+function buildTestStructure(
+  codeBlocks: CodeBlock[],
+  headings: Heading[],
+  acceptedLangs: string[] = ["console", "sh", "bash"],
+): TestStructure {
   const result: TestStructure = { headings: [] }
   const headingBlockCounts = new Map<string, number>()
+  const accepted = new Set(acceptedLangs)
 
   for (let i = 0; i < codeBlocks.length; i++) {
     const block = codeBlocks[i]
@@ -83,14 +101,25 @@ function buildTestStructure(codeBlocks: CodeBlock[], headings: Heading[]): TestS
     // Skip file= blocks (they're helper files/hooks, not test commands)
     if (block.filename) continue
 
-    // Only process shell code blocks
-    if (!block.lang || !["console", "sh", "bash"].includes(block.lang)) {
+    // Only process blocks with accepted languages
+    if (!block.lang || !accepted.has(block.lang)) {
       continue
     }
 
-    const { steps } = parseBlock(block.value)
+    let steps: TestStep[]
 
-    if (!steps.length) continue // Skip empty fences silently
+    if (SHELL_LANGS.has(block.lang)) {
+      // Shell blocks: parse $ commands with expected output
+      const parsed = parseBlock(block.value)
+      steps = parsed.steps
+      if (!steps.length) continue // Skip empty fences silently
+    } else {
+      // Non-shell blocks (tape, etc.): entire block is a single step
+      // The plugin receives the full content and handles its own parsing
+      const content = block.value.trim()
+      if (!content) continue
+      steps = [{ cmd: content, expected: { stdout: undefined, stderr: undefined, exit: undefined } }]
+    }
 
     const nearestHeading = findNearestHeading(headings, block.position.start)
     const testId = generateTestId(nearestHeading, i, headingBlockCounts)
@@ -273,16 +302,26 @@ function registerNestedTests(
         testName = testName.slice(0, MAX_TEST_NAME_LENGTH - 3) + "..."
       }
 
-      adapter.test(`$ ${testName}`, async () => {
+      const isShell = SHELL_LANGS.has(item.block.lang || "console")
+      const testPrefix = isShell ? "$ " : ""
+
+      adapter.test(`${testPrefix}${testName}`, async () => {
         for (const step of item.steps) {
-          const cmdLines = step.cmd.split("\n")
-          const blockText =
-            cmdLines.length === 1
-              ? `$ ${step.cmd}`
-              : `$ ${cmdLines[0]}\n${cmdLines
-                  .slice(1)
-                  .map((l) => `> ${l}`)
-                  .join("\n")}`
+          // Shell blocks: wrap with $ prefix for extractCommands()
+          // Non-shell blocks: pass content as-is to the plugin
+          let blockText: string
+          if (isShell) {
+            const cmdLines = step.cmd.split("\n")
+            blockText =
+              cmdLines.length === 1
+                ? `$ ${step.cmd}`
+                : `$ ${cmdLines[0]}\n${cmdLines
+                    .slice(1)
+                    .map((l) => `> ${l}`)
+                    .join("\n")}`
+          } else {
+            blockText = step.cmd
+          }
 
           const blockResult = await executor.executeBlock(
             {
