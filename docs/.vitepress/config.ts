@@ -6,7 +6,7 @@ const seoOptions = {
   hostname: "https://beorn.codes/mdspec",
   siteName: "mdspec",
   description: "Markdown-driven test runner",
-  ogImage: "https://beorn.codes/mdspec/og-image.svg",
+  ogImage: "https://beorn.codes/mdspec/og-image.png",
   author: "Bjørn Stabell",
   codeRepository: "https://github.com/beorn/mdspec",
 }
