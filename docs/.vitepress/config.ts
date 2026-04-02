@@ -1,10 +1,31 @@
 import { defineConfig } from "vitepress"
+import llmstxt from "vitepress-plugin-llms"
+import { seoHead, seoTransformPageData } from "@bearly/vitepress-enrich"
+
+const seoOptions = {
+  hostname: "https://beorn.codes/mdspec",
+  siteName: "mdspec",
+  description: "Markdown-driven test runner",
+  ogImage: "https://beorn.codes/mdspec/og-image.svg",
+  author: "Bjørn Stabell",
+  codeRepository: "https://github.com/beorn/mdspec",
+}
 
 export default defineConfig({
   title: "mdspec",
   description: "Write tests in markdown. Run them as code.",
   base: "/mdspec/",
-  sitemap: { hostname: "https://beorn.codes/mdspec" },
+  lastUpdated: true,
+
+  sitemap: { hostname: "https://beorn.codes/mdspec/" },
+
+  vite: {
+    plugins: [llmstxt()],
+    ssr: {
+      noExternal: ["@bearly/vitepress-enrich"],
+    },
+  },
+
   head: [
     ["link", { rel: "icon", type: "image/svg+xml", href: "/mdspec/favicon.svg" }],
     [
@@ -15,39 +36,11 @@ export default defineConfig({
         "data-cf-beacon": '{"token": "d9b13df1eca0424c884faea71f34e09f"}',
       },
     ],
-    ["meta", { property: "og:type", content: "website" }],
-    ["meta", { property: "og:site_name", content: "mdtest" }],
-    ["meta", { name: "twitter:card", content: "summary" }],
-    [
-      "script",
-      { type: "application/ld+json" },
-      JSON.stringify({
-        "@context": "https://schema.org",
-        "@type": "WebSite",
-        name: "mdtest",
-        url: "https://beorn.codes/mdspec",
-        description: "Markdown-driven test runner",
-      }),
-    ],
+    ...seoHead(seoOptions),
   ],
-  transformPageData(pageData) {
-    const cleanPath = pageData.relativePath
-      .replace(/\.md$/, ".html")
-      .replace(/index\.html$/, "")
-    pageData.frontmatter.head ??= []
-    pageData.frontmatter.head.push(
-      ["link", { rel: "canonical", href: `https://beorn.codes/mdspec/${cleanPath}` }],
-      ["meta", { property: "og:title", content: pageData.title || "mdtest" }],
-      [
-        "meta",
-        {
-          property: "og:description",
-          content: pageData.description || "Markdown-driven test runner",
-        },
-      ],
-      ["meta", { property: "og:url", content: `https://beorn.codes/mdspec/${cleanPath}` }],
-    )
-  },
+
+  transformPageData: seoTransformPageData(seoOptions),
+
   themeConfig: {
     nav: [
       { text: "Guide", link: "/guide/getting-started" },
@@ -75,8 +68,9 @@ export default defineConfig({
     ],
     socialLinks: [{ icon: "github", link: "https://github.com/beorn/mdspec" }],
     footer: {
-      message: 'Used by <a href="https://silvery.dev">Silvery</a> and <a href="https://termless.dev">Termless</a> for executable documentation',
-      copyright: 'Built by <a href="https://beorn.codes">Bjørn Stabell</a>'
+      message:
+        'Used by <a href="https://silvery.dev">Silvery</a> and <a href="https://termless.dev">Termless</a> for executable documentation',
+      copyright: 'Built by <a href="https://beorn.codes">Bjørn Stabell</a>',
     },
     search: { provider: "local" },
   },
