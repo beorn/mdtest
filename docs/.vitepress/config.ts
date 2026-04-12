@@ -3,10 +3,10 @@ import llmstxt from "vitepress-plugin-llms"
 import { seoHead, seoTransformPageData } from "@bearly/vitepress-enrich"
 
 const seoOptions = {
-  hostname: "https://beorn.codes/mdspec",
+  hostname: "https://mdspec.org",
   siteName: "mdspec",
   description: "Markdown-driven test runner",
-  ogImage: "https://beorn.codes/mdspec/og-image.png",
+  ogImage: "https://mdspec.org/og-image.png",
   author: "Bjørn Stabell",
   codeRepository: "https://github.com/beorn/mdspec",
 }
@@ -14,10 +14,10 @@ const seoOptions = {
 export default defineConfig({
   title: "mdspec",
   description: "Write tests in markdown. Run them as code.",
-  base: "/mdspec/",
+  base: "/",
   lastUpdated: true,
 
-  sitemap: { hostname: "https://beorn.codes/mdspec/" },
+  sitemap: { hostname: "https://mdspec.org/" },
 
   vite: {
     plugins: [llmstxt()],
@@ -27,7 +27,7 @@ export default defineConfig({
   },
 
   head: [
-    ["link", { rel: "icon", type: "image/svg+xml", href: "/mdspec/favicon.svg" }],
+    ["link", { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" }],
     [
       "script",
       {

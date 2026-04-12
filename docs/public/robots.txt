@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://beorn.codes/mdspec/sitemap.xml
+Sitemap: https://mdspec.org/sitemap.xml
