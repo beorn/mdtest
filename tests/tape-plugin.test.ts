@@ -298,8 +298,8 @@ describe("tape fence options", () => {
     const svg = readFileSync(join(snapDir, "size-test.svg"), "utf8")
     // SVG dimensions should reflect 120 cols
     expect(svg).toContain("<svg")
-    // With default cell width of 8.4, 120 cols = 1008 width
-    expect(svg).toMatch(/width="1008"/)
+    // With termless DEFAULT_CELL_WIDTH of 9.6, 120 cols = 1152 width
+    expect(svg).toMatch(/width="1152"/)
   })
 
   test("heading slug is used in screenshot names", async () => {

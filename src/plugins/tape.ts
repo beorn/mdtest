@@ -11,7 +11,13 @@ import type { Plugin, FileOpts, BlockOpts, ExecFn, ReplResult } from "../types.j
 // Termless imports are dynamic to avoid tsc errors in standalone CI
 // (these packages are optional peer deps, only available in the km monorepo)
 type TapeCommand = { type: string; text: string; key: string; count?: number; value: string; path?: string }
-type Terminal = { feed(data: string): void; cols: number; rows: number; resize(cols: number, rows: number): void; close(): Promise<void> }
+type Terminal = {
+  feed(data: string): void
+  cols: number
+  rows: number
+  resize(cols: number, rows: number): void
+  close(): Promise<void>
+}
 
 async function loadTermless() {
   // Variable indirection prevents tsc from resolving these optional peer deps
