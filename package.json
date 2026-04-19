@@ -74,7 +74,7 @@
     "@types/bun": "latest",
     "@types/debug": "^4.1.12",
     "@types/mdast": "^4.0.4",
-    "@types/node": "^22.0.0",
+    "@types/node": "^25.6.0",
     "commander": "^14.0.1",
     "loggily": "^0.4.2",
     "typescript": "latest",
